@@ -1,4 +1,8 @@
 ﻿#include <ntifs.h>
+#include <ntstrsafe.h>
+
+#define MY_DEVICE_NAME L"\\Device\\MyCoverProcess"
+#define MY_SYMBOLIC_LINK_NAME L"\\DosDevices\\MyCoverProcessLink"
 
 NTKERNELAPI
 NTSTATUS PsLookupProcessByProcessId(
@@ -11,6 +15,11 @@ PsGetProcessImageFileName(
 	__in PEPROCESS Process
 );
 VOID DriverUnload(DRIVER_OBJECT* DriverObject) {
+	UNICODE_STRING symbolicLinkName;
+
+	RtlInitUnicodeString(&symbolicLinkName, MY_SYMBOLIC_LINK_NAME); // 替换为实际链接名称
+	IoDeleteSymbolicLink(&symbolicLinkName);
+	IoDeleteDevice(DriverObject->DeviceObject);
 	DbgPrintEx(77, 0, "DriverUnload\n");
 }
 
@@ -26,16 +35,83 @@ VOID GetProcess() {
 	}
 }
 
+NTSTATUS
+IrpCommon(
+	_In_ struct _DEVICE_OBJECT* DeviceObject,
+	_Inout_ struct _IRP* Irp
+)
+{
+	DbgPrintEx(77, 0, "IRP_MJ_READ called\n");
+	Irp->IoStatus.Status = STATUS_SUCCESS;
+	IoCompleteRequest(Irp, IO_NO_INCREMENT);
+	return STATUS_SUCCESS;
+}
+NTSTATUS
+ReadDriver(
+	_In_ struct _DEVICE_OBJECT* DeviceObject,
+	_Inout_ struct _IRP* Irp
+)
+{
+	DbgPrintEx(77, 0, "IRP_MJ_READ called\n");
+	Irp->IoStatus.Status = STATUS_SUCCESS;
+	Irp->IoStatus.Information = 0;
+	IoCompleteRequest(Irp, IO_NO_INCREMENT);
+
+
+
+	return STATUS_SUCCESS;
+	GetProcess();
+
+}
 NTSTATUS DriverEntry(
 	IN PDRIVER_OBJECT DriverObject,
 	IN PUNICODE_STRING RegistryPath
 )
 {
-	DriverObject->DriverUnload = DriverUnload;
 	DbgPrintEx(77, 0, "DriverEntry\n");
 	DbgBreakPoint();
-	GetProcess();
-	NTSTATUS status;
+
+	UNREFERENCED_PARAMETER(RegistryPath);
+
+	PDEVICE_OBJECT deviceObject;
+	UNICODE_STRING deviceName;
+	UNICODE_STRING symbolicLinkName;
+
+	RtlInitUnicodeString(&deviceName, MY_DEVICE_NAME);
+	RtlInitUnicodeString(&symbolicLinkName, MY_SYMBOLIC_LINK_NAME); // 替换为实际链接名称
+
+	for (int i = 0; i < IRP_MJ_MAXIMUM_FUNCTION; i++) {
+		DriverObject->MajorFunction[i] = IrpCommon;
+	}
+
+	DriverObject->DriverUnload = DriverUnload;
+	DriverObject->MajorFunction[IRP_MJ_READ] = ReadDriver;
+
+	NTSTATUS status = IoCreateDevice(
+		DriverObject,
+		0,
+		&deviceName,
+		FILE_DEVICE_UNKNOWN,
+		0,
+		TRUE,
+		&deviceObject);
+	if (!NT_SUCCESS(status)) {
+		DbgPrintEx(77, 0, "Failed to create device (0x%X)\n", status);
+		return status;
+	}
+
+	status = IoCreateSymbolicLink(&symbolicLinkName, &deviceName);
+	if (NT_SUCCESS(status))
+	{
+		DbgPrintEx(77, 0, "Symbolic link created successfully.\n");
+	}
+	else {
+		DbgPrintEx(77, 0, "Failed to create symbolic link. Status: 0x%X\n", status);
+		return status;
+	}
+
+	deviceObject->Flags |= DO_BUFFERED_IO;
+
 	status = STATUS_SUCCESS;
 
 	return status;
