@@ -41,18 +41,67 @@ IrpCommon(
 	_Inout_ struct _IRP* Irp
 )
 {
-	DbgPrintEx(77, 0, "IRP_MJ_READ called\n");
+	DbgPrintEx(77, 0, "IrpCommon called\n");
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 	return STATUS_SUCCESS;
 }
 NTSTATUS
-ReadDriver(
+CreateFileDevice(
+	_In_ struct _DEVICE_OBJECT* DeviceObject,
+	_Inout_ struct _IRP* Irp
+)
+{
+	DbgPrintEx(77, 0, "IRP_MJ_CREATE called\n");
+	Irp->IoStatus.Status = STATUS_SUCCESS;
+	IoCompleteRequest(Irp, IO_NO_INCREMENT);
+
+
+
+	return STATUS_SUCCESS;
+	GetProcess();
+
+}
+NTSTATUS
+CloseFileDevice(
+	_In_ struct _DEVICE_OBJECT* DeviceObject,
+	_Inout_ struct _IRP* Irp
+)
+{
+	DbgPrintEx(77, 0, "IRP_MJ_CLOSE called\n");
+	Irp->IoStatus.Status = STATUS_SUCCESS;
+	IoCompleteRequest(Irp, IO_NO_INCREMENT);
+
+
+
+	return STATUS_SUCCESS;
+	GetProcess();
+
+}
+NTSTATUS
+ReadFileDevice(
 	_In_ struct _DEVICE_OBJECT* DeviceObject,
 	_Inout_ struct _IRP* Irp
 )
 {
 	DbgPrintEx(77, 0, "IRP_MJ_READ called\n");
+	Irp->IoStatus.Status = STATUS_SUCCESS;
+	Irp->IoStatus.Information = 0;
+	IoCompleteRequest(Irp, IO_NO_INCREMENT);
+
+
+
+	return STATUS_SUCCESS;
+	GetProcess();
+
+}
+NTSTATUS
+WriteFileDevice(
+	_In_ struct _DEVICE_OBJECT* DeviceObject,
+	_Inout_ struct _IRP* Irp
+)
+{
+	DbgPrintEx(77, 0, "IRP_MJ_WRITE called\n");
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	Irp->IoStatus.Information = 0;
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
@@ -85,7 +134,10 @@ NTSTATUS DriverEntry(
 	}
 
 	DriverObject->DriverUnload = DriverUnload;
-	DriverObject->MajorFunction[IRP_MJ_READ] = ReadDriver;
+	DriverObject->MajorFunction[IRP_MJ_CREATE] = CreateFileDevice;
+	DriverObject->MajorFunction[IRP_MJ_CLOSE] = CloseFileDevice;
+	DriverObject->MajorFunction[IRP_MJ_READ] = ReadFileDevice;
+	DriverObject->MajorFunction[IRP_MJ_WRITE] = WriteFileDevice;
 
 	NTSTATUS status = IoCreateDevice(
 		DriverObject,

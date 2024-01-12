@@ -1,20 +1,42 @@
-﻿// UserSyncDriver.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
-
+﻿#include <windows.h>
 #include <iostream>
 
-int main()
-{
-	std::cout << "Hello World!\n";
+int main() {
+	// 替换成你的设备名称
+	LPCWSTR deviceName = L"\\\\.\\MyCoverProcessLink";
+
+	// 打开设备
+	HANDLE hDevice = CreateFile(
+		deviceName,
+		GENERIC_READ | GENERIC_WRITE,
+		0,
+		NULL,
+		OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL
+	);
+
+	if (hDevice == INVALID_HANDLE_VALUE) {
+		std::cerr << "Failed to open device. Error code: " << GetLastError() << std::endl;
+		return -1;
+	}
+
+	// 这里可以在设备上执行读写操作
+	char buffer[1024];
+	DWORD bytesRead;
+
+	// 读取数据
+	if (ReadFile(hDevice, buffer, sizeof(buffer), &bytesRead, NULL)) {
+		std::cout << "Read " << bytesRead << " bytes from the device." << std::endl;
+
+		// 处理读取到的数据，可以根据实际情况进行操作
+	}
+	else {
+		std::cerr << "Failed to read from device. Error code: " << GetLastError() << std::endl;
+	}
+
+	// 关闭设备句柄
+	CloseHandle(hDevice);
+
+	return 0;
 }
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
