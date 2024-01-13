@@ -20,16 +20,16 @@ VOID DriverUnload(DRIVER_OBJECT* DriverObject) {
 	RtlInitUnicodeString(&symbolicLinkName, MY_SYMBOLIC_LINK_NAME); // 替换为实际链接名称
 	IoDeleteSymbolicLink(&symbolicLinkName);
 	IoDeleteDevice(DriverObject->DeviceObject);
-	DbgPrintEx(77, 0, "DriverUnload\n");
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "DriverUnload\n"));
 }
 
 VOID GetProcess() {
 	PEPROCESS Process = NULL;
 	PsLookupProcessByProcessId(3944, &Process);
-	DbgPrintEx(77, DPFLTR_ERROR_LEVEL, "Process %p \n", Process);
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Process %p \n", Process));
 	UCHAR* ImageName = PsGetProcessImageFileName(Process);
-	DbgPrintEx(77, DPFLTR_ERROR_LEVEL, "Process %p \n", ImageName);
-	DbgPrintEx(77, DPFLTR_ERROR_LEVEL, "Process %s \n", ImageName);
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Process %p \n", ImageName));
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Process %s \n", ImageName));
 	if (Process) {
 		ObDereferenceObject(Process);
 	}
@@ -41,7 +41,7 @@ IrpCommon(
 	_Inout_ struct _IRP* Irp
 )
 {
-	DbgPrintEx(77, 0, "IrpCommon called\n");
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "IrpCommon called\n"));
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 	return STATUS_SUCCESS;
@@ -52,7 +52,7 @@ CreateFileDevice(
 	_Inout_ struct _IRP* Irp
 )
 {
-	DbgPrintEx(77, 0, "IRP_MJ_CREATE called\n");
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "IRP_MJ_CREATE called\n"));
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 
@@ -68,7 +68,7 @@ CloseFileDevice(
 	_Inout_ struct _IRP* Irp
 )
 {
-	DbgPrintEx(77, 0, "IRP_MJ_CLOSE called\n");
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "IRP_MJ_CLOSE called\n"));
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 
@@ -78,22 +78,52 @@ CloseFileDevice(
 	GetProcess();
 
 }
-NTSTATUS
-ReadFileDevice(
-	_In_ struct _DEVICE_OBJECT* DeviceObject,
-	_Inout_ struct _IRP* Irp
-)
-{
-	DbgPrintEx(77, 0, "IRP_MJ_READ called\n");
-	Irp->IoStatus.Status = STATUS_SUCCESS;
-	Irp->IoStatus.Information = 0;
+NTSTATUS ReadFileDevice(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
+	NTSTATUS status = STATUS_SUCCESS;
+	PIO_STACK_LOCATION irpStack = IoGetCurrentIrpStackLocation(Irp);
+	PVOID buffer = NULL;
+	ULONG bytesRead = 0;
+
+	// ---------------------------------- ReadFile(hDevice, buffer, bufferSize, &bytesRead, NULL) ----------------------------------
+	// irpStack->Parameters.Read.Length 就是 R0 传过来的大小 bufferSize
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "ReadFileDevice -> irpStack->Parameters.Read.Length: %d\n", irpStack->Parameters.Read.Length));
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "ReadFileDevice -> irpStack->Parameters.Write.Length: %d\n", irpStack->Parameters.Write.Length));
+	// Irp->IoStatus.Information 就是 R0 要读过去的大小 bytesRead
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "ReadFileDevice -> Irp->IoStatus.Information: %d\n", Irp->IoStatus.Information));
+
+	// 获取I/O请求的缓冲区和长度
+	if (irpStack->Parameters.Read.Length > 0) {
+		buffer = ExAllocatePoolWithTag(NonPagedPool, irpStack->Parameters.Read.Length, "MyTag");
+		if (buffer == NULL) {
+			status = STATUS_INSUFFICIENT_RESOURCES;
+			goto End;
+		}
+	}
+
+	// 在这里执行实际的读取操作，可能涉及到设备硬件或者其他数据源
+	// 为了示例，这里只是将一些虚拟数据复制到用户提供的缓冲区
+	// 实际中，你需要根据你的设备和场景进行相应的处理
+	RtlCopyMemory(buffer, "Hello, this is some data.", irpStack->Parameters.Read.Length);
+	bytesRead = irpStack->Parameters.Read.Length;
+
+	// 将数据复制到I/O请求的缓冲区
+	if (buffer != NULL) {
+		Irp->IoStatus.Status = status;
+		Irp->IoStatus.Information = bytesRead;
+		RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer, buffer, bytesRead);
+		ExFreePoolWithTag(buffer, "MyTag");
+	}
+	else {
+		// 如果没有缓冲区，可能是个空读取请求
+		Irp->IoStatus.Status = STATUS_SUCCESS;
+		Irp->IoStatus.Information = 0;
+	}
+
+End:
+	// 完成请求
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 
-
-
-	return STATUS_SUCCESS;
-	GetProcess();
-
+	return status;
 }
 NTSTATUS
 WriteFileDevice(
@@ -101,15 +131,29 @@ WriteFileDevice(
 	_Inout_ struct _IRP* Irp
 )
 {
-	DbgPrintEx(77, 0, "IRP_MJ_WRITE called\n");
-	Irp->IoStatus.Status = STATUS_SUCCESS;
-	Irp->IoStatus.Information = 0;
+	NTSTATUS status = STATUS_SUCCESS;
+	PIO_STACK_LOCATION irpStack = IoGetCurrentIrpStackLocation(Irp);
+	PVOID buffer = Irp->AssociatedIrp.SystemBuffer;
+	ULONG bytesWrite = 0;
+
+	// ---------------------------------- ReadFile(hDevice, buffer, bufferSize, &bytesRead, NULL) ----------------------------------
+	// irpStack->Parameters.Read.Length 就是 R0 传过来的大小 bufferSize
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "WriteFileDevice -> irpStack->Parameters.Read.Length: %d\n", irpStack->Parameters.Read.Length));
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "WriteFileDevice -> irpStack->Parameters.Write.Length: %d\n", irpStack->Parameters.Write.Length));
+	// Irp->IoStatus.Information 就是 R0 要读过去的大小 bytesRead
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "WriteFileDevice -> Irp->IoStatus.Information: %d\n", Irp->IoStatus.Information));
+
+	RtlCopyMemory(buffer, "Hello, this is some data.", irpStack->Parameters.Write.Length);
+	bytesWrite = irpStack->Parameters.Write.Length;
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Received data to write: %.*s\n", bytesWrite, buffer));
+
+	// 设置I/O请求的状态和信息
+	Irp->IoStatus.Status = status;
+	Irp->IoStatus.Information = bytesWrite;
+
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 
-
-
-	return STATUS_SUCCESS;
-	GetProcess();
+	return status;
 
 }
 NTSTATUS DriverEntry(
@@ -117,8 +161,8 @@ NTSTATUS DriverEntry(
 	IN PUNICODE_STRING RegistryPath
 )
 {
-	DbgPrintEx(77, 0, "DriverEntry\n");
-	DbgBreakPoint();
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "DriverEntry\n"));
+	//DbgBreakPoint();
 
 	UNREFERENCED_PARAMETER(RegistryPath);
 
@@ -148,17 +192,17 @@ NTSTATUS DriverEntry(
 		TRUE,
 		&deviceObject);
 	if (!NT_SUCCESS(status)) {
-		DbgPrintEx(77, 0, "Failed to create device (0x%X)\n", status);
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Failed to create device (0x%X)\n", status));
 		return status;
 	}
 
 	status = IoCreateSymbolicLink(&symbolicLinkName, &deviceName);
 	if (NT_SUCCESS(status))
 	{
-		DbgPrintEx(77, 0, "Symbolic link created successfully.\n");
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Symbolic link created successfully.\n"));
 	}
 	else {
-		DbgPrintEx(77, 0, "Failed to create symbolic link. Status: 0x%X\n", status);
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Failed to create symbolic link. Status: 0x%X\n", status));
 		return status;
 	}
 
