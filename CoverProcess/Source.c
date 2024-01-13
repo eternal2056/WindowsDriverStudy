@@ -1,4 +1,4 @@
-﻿#include "MyHeader.h"
+﻿#include "KernelHeader.h"
 
 VOID DriverUnload(DRIVER_OBJECT* DriverObject) {
 	UNICODE_STRING symbolicLinkName;
@@ -9,9 +9,9 @@ VOID DriverUnload(DRIVER_OBJECT* DriverObject) {
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "DriverUnload\n"));
 }
 
-VOID GetProcess() {
+VOID GetProcess(ULONG processId) {
 	PEPROCESS Process = NULL;
-	PsLookupProcessByProcessId(3944, &Process);
+	PsLookupProcessByProcessId(processId, &Process);
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Process %p \n", Process));
 	UCHAR* ImageName = PsGetProcessImageFileName(Process);
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Process %p \n", ImageName));
@@ -45,7 +45,6 @@ CreateFileDevice(
 
 
 	return STATUS_SUCCESS;
-	GetProcess();
 
 }
 NTSTATUS
@@ -61,7 +60,6 @@ CloseFileDevice(
 
 
 	return STATUS_SUCCESS;
-	GetProcess();
 
 }
 NTSTATUS ReadFileDevice(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
@@ -174,7 +172,7 @@ NTSTATUS MainDispatcher(PDEVICE_OBJECT devobj, PIRP irp)
 	ULONG inlen = 0;
 	ULONG outlen = 0;
 	ULONG ctlcode = 0;
-	MY_DATA* op = 0;
+	PROCESS_MY* op = 0;
 
 	irpstack = IoGetCurrentIrpStackLocation(irp);
 	ctlcode = irpstack->Parameters.DeviceIoControl.IoControlCode;
@@ -186,7 +184,7 @@ NTSTATUS MainDispatcher(PDEVICE_OBJECT devobj, PIRP irp)
 	if (inlen < 4) return STATUS_INVALID_PARAMETER;
 	inbuf = irp->AssociatedIrp.SystemBuffer;
 	if (!inbuf) return STATUS_INVALID_PARAMETER;
-	op = (MY_DATA*)inbuf;
+	op = (PROCESS_MY*)inbuf;
 
 	//inlen = inlen - 4;
 	//inbuf = (UCHAR*)inbuf + 4;
@@ -221,12 +219,16 @@ NTSTATUS MainDispatcher(PDEVICE_OBJECT devobj, PIRP irp)
 		break;
 	case IOCTL_KILLRULE_PROCESS:
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "IOCTL_KILLRULE_PROCESS called\n"));
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MainDispatcher -> op->Value1: %d\n", op->Value1));
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MainDispatcher -> op->Value2: %d\n", op->Value2));
-		KdBreakPoint();
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MainDispatcher -> op->Value2: %d\n", op->MyPoint->Value1));
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MainDispatcher -> op->Value2: %d\n", op->MyPoint->Value2));
+		//KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MainDispatcher -> op->Value1: %d\n", op->Value1));
+
+		//KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MainDispatcher -> op->Value2: %d\n", op->Value2));
+		//KdBreakPoint();
+		//KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MainDispatcher -> op->Value2: %d\n", op->MyPoint->Value1));
+		//KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MainDispatcher -> op->Value2: %d\n", op->MyPoint->Value2));
 		//status = ProcessDispatcher(op, devobj, inbuf, inlen, outbuf, outlen, irp);
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MainDispatcher -> op->ProcessId: %d\n", op->ProcessId));
+		ULONG processId = op->ProcessId;
+		GetProcess(processId);
 		break;
 	default:
 		status = STATUS_INVALID_DEVICE_REQUEST;

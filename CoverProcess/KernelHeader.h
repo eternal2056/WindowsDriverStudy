@@ -1,11 +1,14 @@
-﻿#include <windows.h>
-#include <iostream>
+﻿#pragma once
+
+#include <ntifs.h>
+#include <ntstrsafe.h>
 
 #define KILLRULE_NTDEVICE_NAME L"\\Device\\KillRuleDrv"
 #define KILLRULE_DOSDEVICE_NAME L"\\DosDevices\\KillRuleDrv"
 #define KILLRULE_USER_SYMBOLINK L"\\\\.\\KillRuleDrv"
 
 #define KILLRULE_DRV_TYPE 41828
+#define KILLRULE_POOLTAG 'OKL'
 
 #define IOCTL_KILLRULE_HEARTBEAT CTL_CODE(KILLRULE_DRV_TYPE, 0x800, METHOD_BUFFERED, FILE_ANY_ACCESS)
 #define IOCTL_KILLRULE_DRIVER CTL_CODE(KILLRULE_DRV_TYPE, 0x801, METHOD_BUFFERED, FILE_ANY_ACCESS)
@@ -16,7 +19,16 @@
 #define IOCTL_KILLRULE_OBJECT CTL_CODE(KILLRULE_DRV_TYPE, 0x940, METHOD_BUFFERED, FILE_ANY_ACCESS)
 #define IOCTL_KILLRULE_PROCESS CTL_CODE(KILLRULE_DRV_TYPE, 0x960, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
-
+NTKERNELAPI
+NTSTATUS PsLookupProcessByProcessId(
+	__in HANDLE ProcessId,
+	__deref_out PEPROCESS* Process
+);
+NTKERNELAPI
+UCHAR*
+PsGetProcessImageFileName(
+	__in PEPROCESS Process
+);
 
 typedef struct _MY_POINT {
 	ULONG Value1;
@@ -28,3 +40,7 @@ typedef struct _MY_DATA {
 	ULONG Value2;
 	MY_POINT* MyPoint;
 } MY_DATA, * PMY_DATA;
+
+typedef struct _PROCESS_MY {
+	ULONG ProcessId;
+} PROCESS_MY, * PPROCESS_MY;

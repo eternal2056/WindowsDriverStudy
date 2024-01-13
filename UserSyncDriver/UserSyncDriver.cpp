@@ -1,4 +1,4 @@
-﻿#include "Header.h"
+﻿#include "UserHeader.h"
 
 void readToDevice(HANDLE hDevice) {
 	// 这里可以在设备上执行读写操作
@@ -60,7 +60,7 @@ void writeToDeviceStucture(HANDLE hDevice) {
 	}
 }
 
-void getProcessName(HANDLE hDevice) {
+void getProcessNameTest(HANDLE hDevice) {
 
 	/*
 	DeviceIoControl(
@@ -91,8 +91,42 @@ void getProcessName(HANDLE hDevice) {
 
 	std::cout << "Write " << sizeof(myData) << " bytes to the device." << std::endl;
 }
+void getProcessName(HANDLE hDevice, int processId) {
 
-int main() {
+	/*
+	DeviceIoControl(
+	_In_ HANDLE hDevice,
+	_In_ DWORD dwIoControlCode,
+	_In_reads_bytes_opt_(nInBufferSize) LPVOID lpInBuffer,
+	_In_ DWORD nInBufferSize,
+	_Out_writes_bytes_to_opt_(nOutBufferSize,*lpBytesReturned) LPVOID lpOutBuffer,
+	_In_ DWORD nOutBufferSize,
+	_Out_opt_ LPDWORD lpBytesReturned,
+	_Inout_opt_ LPOVERLAPPED lpOverlapped
+	);
+	*/
+
+	PROCESS_MY* processData = new PROCESS_MY();
+	processData->ProcessId = processId;
+
+	DWORD bytesReturned;
+	char outBuffer[1024];
+	// 发送IO控制码 IOCTL_MY_FUNCTION
+	if (!DeviceIoControl(hDevice, IOCTL_KILLRULE_PROCESS, processData, sizeof(PROCESS_MY), outBuffer, sizeof(outBuffer), &bytesReturned, NULL)) {
+		// 处理控制码发送失败的情况
+	}
+
+	std::cout << "Write " << sizeof(PROCESS_MY) << " bytes to the device." << std::endl;
+}
+
+int main(int argc, CHAR* argv[]) {
+	int processId;
+	if (argc == 1) {
+		std::cout << "Too few parameters." << std::endl;
+		return 0;
+	}
+	std::string processIdStr = argv[1];
+	processId = std::stoi(processIdStr);
 	// 打开设备
 	HANDLE hDevice = CreateFile(
 		KILLRULE_USER_SYMBOLINK,
@@ -113,7 +147,8 @@ int main() {
 	//readToDevice(hDevice);
 	//writeToDevice(hDevice);
 	//writeToDeviceStucture(hDevice);
-	getProcessName(hDevice);
+	//getProcessNameTest(hDevice);
+	getProcessName(hDevice, processId);
 
 	// 关闭设备句柄
 	CloseHandle(hDevice);

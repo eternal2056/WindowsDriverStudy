@@ -24,7 +24,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="MyHeader.h">
+    <ClInclude Include="KernelHeader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
