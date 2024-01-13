@@ -1,23 +1,9 @@
-﻿#include <ntifs.h>
-#include <ntstrsafe.h>
+﻿#include "MyHeader.h"
 
-#define MY_DEVICE_NAME L"\\Device\\MyCoverProcess"
-#define MY_SYMBOLIC_LINK_NAME L"\\DosDevices\\MyCoverProcessLink"
-
-NTKERNELAPI
-NTSTATUS PsLookupProcessByProcessId(
-	__in HANDLE ProcessId,
-	__deref_out PEPROCESS* Process
-);
-NTKERNELAPI
-UCHAR*
-PsGetProcessImageFileName(
-	__in PEPROCESS Process
-);
 VOID DriverUnload(DRIVER_OBJECT* DriverObject) {
 	UNICODE_STRING symbolicLinkName;
 
-	RtlInitUnicodeString(&symbolicLinkName, MY_SYMBOLIC_LINK_NAME); // 替换为实际链接名称
+	RtlInitUnicodeString(&symbolicLinkName, KILLRULE_DOSDEVICE_NAME); // 替换为实际链接名称
 	IoDeleteSymbolicLink(&symbolicLinkName);
 	IoDeleteDevice(DriverObject->DeviceObject);
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "DriverUnload\n"));
@@ -79,6 +65,7 @@ CloseFileDevice(
 
 }
 NTSTATUS ReadFileDevice(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "IRP_MJ_READ called\n"));
 	NTSTATUS status = STATUS_SUCCESS;
 	PIO_STACK_LOCATION irpStack = IoGetCurrentIrpStackLocation(Irp);
 	PVOID buffer = NULL;
@@ -131,6 +118,7 @@ WriteFileDevice(
 	_Inout_ struct _IRP* Irp
 )
 {
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "IRP_MJ_WRITE called\n"));
 	NTSTATUS status = STATUS_SUCCESS;
 	PIO_STACK_LOCATION irpStack = IoGetCurrentIrpStackLocation(Irp);
 	PVOID buffer = Irp->AssociatedIrp.SystemBuffer;
@@ -156,13 +144,106 @@ WriteFileDevice(
 	return status;
 
 }
+
+NTSTATUS DuplicateInputBuffer(IN PIRP irp, PVOID inbuf)
+{
+	NTSTATUS status = STATUS_SUCCESS;
+	PIO_STACK_LOCATION	irpstack;
+	PVOID inbuf_dup = NULL;
+	PVOID outbuf = NULL;
+	ULONG inlen = 0;
+	irpstack = IoGetCurrentIrpStackLocation(irp);
+	inlen = irpstack->Parameters.DeviceIoControl.InputBufferLength - 4;
+	if (inbuf && inlen) {
+		inbuf_dup = ExAllocatePoolWithTag(NonPagedPool, inlen, KILLRULE_POOLTAG);
+		if (!inbuf_dup) return STATUS_MEMORY_NOT_ALLOCATED;
+		RtlCopyMemory(inbuf_dup, inbuf, inlen);
+		inbuf = inbuf_dup;
+	}
+	return status;
+}
+
+NTSTATUS MainDispatcher(PDEVICE_OBJECT devobj, PIRP irp)
+{
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "IRP_MJ_DEVICE_CONTROL called\n"));
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
+	PIO_STACK_LOCATION	irpstack;
+	PVOID inbuf_dup = NULL;
+	PVOID inbuf = NULL;
+	PVOID outbuf = NULL;
+	ULONG inlen = 0;
+	ULONG outlen = 0;
+	ULONG ctlcode = 0;
+	MY_DATA* op = 0;
+
+	irpstack = IoGetCurrentIrpStackLocation(irp);
+	ctlcode = irpstack->Parameters.DeviceIoControl.IoControlCode;
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MainDispatcher -> irpstack->Parameters.DeviceIoControl.IoControlCode: %d\n", ctlcode));
+
+	// [TODO] try except ProbeForRead/Write
+	inlen = irpstack->Parameters.DeviceIoControl.InputBufferLength;
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MainDispatcher -> irpstack->Parameters.DeviceIoControl.InputBufferLength: %d\n", inlen));
+	if (inlen < 4) return STATUS_INVALID_PARAMETER;
+	inbuf = irp->AssociatedIrp.SystemBuffer;
+	if (!inbuf) return STATUS_INVALID_PARAMETER;
+	op = (MY_DATA*)inbuf;
+
+	//inlen = inlen - 4;
+	//inbuf = (UCHAR*)inbuf + 4;
+
+	//status = DuplicateInputBuffer(irp, inbuf);
+	//if (!NT_SUCCESS(status)) return status;
+
+	//outbuf = irp->AssociatedIrp.SystemBuffer;
+	//outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
+
+	switch (ctlcode) {
+	case IOCTL_KILLRULE_HEARTBEAT:
+		status = STATUS_SUCCESS;
+		break;
+	case IOCTL_KILLRULE_DRIVER:
+		//status = DriverDispatcher(op, devobj, irp);
+		break;
+	case IOCTL_KILLRULE_NOTIFY:
+		//status = NotifyDispatcher(op, devobj, irp);
+		break;
+	case IOCTL_KILLRULE_MEMORY:
+		//status = MemoryDispatcher(op, devobj, inbuf, inlen, outbuf, outlen, irp);
+		break;
+	case IOCTL_KILLRULE_HOTKEY:
+		//status = HotkeyDispatcher(op, devobj, irp);
+		break;
+	case IOCTL_KILLRULE_STORAGE:
+		//status = StorageDispatcher(op, devobj, irp);
+		break;
+	case IOCTL_KILLRULE_OBJECT:
+		//status = ObjectDispatcher(op, devobj, inbuf, inlen, outbuf, outlen, irp);
+		break;
+	case IOCTL_KILLRULE_PROCESS:
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "IOCTL_KILLRULE_PROCESS called\n"));
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MainDispatcher -> op->Value1: %d\n", op->Value1));
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MainDispatcher -> op->Value2: %d\n", op->Value2));
+		KdBreakPoint();
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MainDispatcher -> op->Value2: %d\n", op->MyPoint->Value1));
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MainDispatcher -> op->Value2: %d\n", op->MyPoint->Value2));
+		//status = ProcessDispatcher(op, devobj, inbuf, inlen, outbuf, outlen, irp);
+		break;
+	default:
+		status = STATUS_INVALID_DEVICE_REQUEST;
+		break;
+	}
+	irp->IoStatus.Status = status;
+	IoCompleteRequest(irp, IO_NO_INCREMENT);
+	return status;
+}
+
 NTSTATUS DriverEntry(
 	IN PDRIVER_OBJECT DriverObject,
 	IN PUNICODE_STRING RegistryPath
 )
 {
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "DriverEntry\n"));
-	//DbgBreakPoint();
+	//KdBreakPoint();
 
 	UNREFERENCED_PARAMETER(RegistryPath);
 
@@ -170,8 +251,8 @@ NTSTATUS DriverEntry(
 	UNICODE_STRING deviceName;
 	UNICODE_STRING symbolicLinkName;
 
-	RtlInitUnicodeString(&deviceName, MY_DEVICE_NAME);
-	RtlInitUnicodeString(&symbolicLinkName, MY_SYMBOLIC_LINK_NAME); // 替换为实际链接名称
+	RtlInitUnicodeString(&deviceName, KILLRULE_NTDEVICE_NAME);
+	RtlInitUnicodeString(&symbolicLinkName, KILLRULE_DOSDEVICE_NAME); // 替换为实际链接名称
 
 	for (int i = 0; i < IRP_MJ_MAXIMUM_FUNCTION; i++) {
 		DriverObject->MajorFunction[i] = IrpCommon;
@@ -182,6 +263,7 @@ NTSTATUS DriverEntry(
 	DriverObject->MajorFunction[IRP_MJ_CLOSE] = CloseFileDevice;
 	DriverObject->MajorFunction[IRP_MJ_READ] = ReadFileDevice;
 	DriverObject->MajorFunction[IRP_MJ_WRITE] = WriteFileDevice;
+	DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = MainDispatcher;
 
 	NTSTATUS status = IoCreateDevice(
 		DriverObject,

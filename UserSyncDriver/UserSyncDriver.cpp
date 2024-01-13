@@ -1,5 +1,4 @@
-﻿#include <windows.h>
-#include <iostream>
+﻿#include "Header.h"
 
 void readToDevice(HANDLE hDevice) {
 	// 这里可以在设备上执行读写操作
@@ -24,6 +23,7 @@ void readToDevice(HANDLE hDevice) {
 		std::cerr << "Failed to read from device. Error code: " << GetLastError() << std::endl;
 	}
 }
+
 void writeToDevice(HANDLE hDevice) {
 	// 使用动态内存分配
 	char buffer[] = "Data to be written to the driver.";
@@ -40,13 +40,62 @@ void writeToDevice(HANDLE hDevice) {
 	}
 }
 
-int main() {
-	// 替换成你的设备名称
-	LPCWSTR deviceName = L"\\\\.\\MyCoverProcessLink";
 
+
+void writeToDeviceStucture(HANDLE hDevice) {
+	PMY_DATA myData = new MY_DATA();
+	myData->Value1 = 1000;
+	myData->Value2 = 2000;
+	myData->MyPoint = new MY_POINT();
+	myData->MyPoint->Value1 = 3000;
+	myData->MyPoint->Value2 = 4000;
+	// 使用动态内存分配
+	DWORD bytesWritten;
+	// 写入数据
+	if (WriteFile(hDevice, myData, sizeof(myData), &bytesWritten, NULL)) {
+		std::cout << "Write " << bytesWritten << " bytes to the device." << std::endl;
+	}
+	else {
+		std::cerr << "Failed to write to device. Error code: " << GetLastError() << std::endl;
+	}
+}
+
+void getProcessName(HANDLE hDevice) {
+
+	/*
+	DeviceIoControl(
+	_In_ HANDLE hDevice,
+	_In_ DWORD dwIoControlCode,
+	_In_reads_bytes_opt_(nInBufferSize) LPVOID lpInBuffer,
+	_In_ DWORD nInBufferSize,
+	_Out_writes_bytes_to_opt_(nOutBufferSize,*lpBytesReturned) LPVOID lpOutBuffer,
+	_In_ DWORD nOutBufferSize,
+	_Out_opt_ LPDWORD lpBytesReturned,
+	_Inout_opt_ LPOVERLAPPED lpOverlapped
+	);
+	*/
+
+	PMY_DATA myData = new MY_DATA();
+	myData->Value1 = 1000;
+	myData->Value2 = 2000;
+	myData->MyPoint = new MY_POINT();
+	myData->MyPoint->Value1 = 3000;
+	myData->MyPoint->Value2 = 4000;
+
+	DWORD bytesReturned;
+	char outBuffer[1024];
+	// 发送IO控制码 IOCTL_MY_FUNCTION
+	if (!DeviceIoControl(hDevice, IOCTL_KILLRULE_PROCESS, myData, sizeof(MY_DATA), outBuffer, sizeof(outBuffer), &bytesReturned, NULL)) {
+		// 处理控制码发送失败的情况
+	}
+
+	std::cout << "Write " << sizeof(myData) << " bytes to the device." << std::endl;
+}
+
+int main() {
 	// 打开设备
 	HANDLE hDevice = CreateFile(
-		deviceName,
+		KILLRULE_USER_SYMBOLINK,
 		GENERIC_READ | GENERIC_WRITE,
 		0,
 		NULL,
@@ -62,12 +111,9 @@ int main() {
 
 
 	//readToDevice(hDevice);
-	writeToDevice(hDevice);
-
-
-
-
-
+	//writeToDevice(hDevice);
+	//writeToDeviceStucture(hDevice);
+	getProcessName(hDevice);
 
 	// 关闭设备句柄
 	CloseHandle(hDevice);
