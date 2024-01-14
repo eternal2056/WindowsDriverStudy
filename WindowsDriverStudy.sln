@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UserSyncDriver", "UserSyncD
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KeyboardFilterDriver", "KeyboardFilterDriver\KeyboardFilterDriver.vcxproj", "{11358B5B-8DA7-40B3-A968-D9759519D88C}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MouseFilterDriver", "MouseFilterDriver\MouseFilterDriver.vcxproj", "{DE1784F5-7E3F-4719-8493-964814FC35BD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -81,6 +83,30 @@ Global
 		{11358B5B-8DA7-40B3-A968-D9759519D88C}.Release|x86.ActiveCfg = Release|Win32
 		{11358B5B-8DA7-40B3-A968-D9759519D88C}.Release|x86.Build.0 = Release|Win32
 		{11358B5B-8DA7-40B3-A968-D9759519D88C}.Release|x86.Deploy.0 = Release|Win32
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Debug|ARM.ActiveCfg = Debug|ARM
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Debug|ARM.Build.0 = Debug|ARM
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Debug|ARM.Deploy.0 = Debug|ARM
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Debug|ARM64.Build.0 = Debug|ARM64
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Debug|ARM64.Deploy.0 = Debug|ARM64
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Debug|x64.ActiveCfg = Debug|x64
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Debug|x64.Build.0 = Debug|x64
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Debug|x64.Deploy.0 = Debug|x64
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Debug|x86.ActiveCfg = Debug|Win32
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Debug|x86.Build.0 = Debug|Win32
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Debug|x86.Deploy.0 = Debug|Win32
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Release|ARM.ActiveCfg = Release|ARM
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Release|ARM.Build.0 = Release|ARM
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Release|ARM.Deploy.0 = Release|ARM
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Release|ARM64.ActiveCfg = Release|ARM64
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Release|ARM64.Build.0 = Release|ARM64
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Release|ARM64.Deploy.0 = Release|ARM64
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Release|x64.ActiveCfg = Release|x64
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Release|x64.Build.0 = Release|x64
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Release|x64.Deploy.0 = Release|x64
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Release|x86.ActiveCfg = Release|Win32
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Release|x86.Build.0 = Release|Win32
+		{DE1784F5-7E3F-4719-8493-964814FC35BD}.Release|x86.Deploy.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
