@@ -2,9 +2,15 @@
 
 #include <ntifs.h>
 #include <ntstrsafe.h>
+#include <ntddkbd.h>
 
 #define KILLRULE_NTDEVICE_NAME L"\\Device\\KillRuleDrv"
 PDEVICE_OBJECT deviceObject = NULL;
+
+typedef struct _MY_EXTENSION {
+	PDEVICE_OBJECT lowerDeviceObject;
+}MY_EXTENSION;
+
 
 VOID DriverUnload(
 	_In_ struct _DRIVER_OBJECT* DriverObject
@@ -16,23 +22,54 @@ NTSTATUS IrpPass(
 	_In_ struct _DEVICE_OBJECT* DeviceObject,
 	_Inout_ struct _IRP* Irp
 ) {
+	IoCopyCurrentIrpStackLocationToNext(Irp);
+	IoCallDriver(((MY_EXTENSION*)deviceObject->DeviceExtension)->lowerDeviceObject, Irp);
+	return STATUS_SUCCESS;
 
 }
+
+NTSTATUS MyCompletionRoutine(
+	_In_ PDEVICE_OBJECT DeviceObject,
+	_In_ PIRP Irp,
+	_In_reads_opt_(_Inexpressible_("varies")) PVOID Context
+) {
+	IoGetCurrentIrpStackLocation(Irp);
+	KEYBOARD_INPUT_DATA* data = (KEYBOARD_INPUT_DATA*)Irp->AssociatedIrp.SystemBuffer;
+
+	if (Irp->IoStatus.Status == STATUS_SUCCESS) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Preesed key is %d\n", data->MakeCode));
+	}
+
+	if (Irp->PendingReturned) {
+		IoMarkIrpPending(Irp);
+	}
+	return Irp->IoStatus.Status;
+}
+
 NTSTATUS ReadFileDevice(
 	_In_ struct _DEVICE_OBJECT* DeviceObject,
 	_Inout_ struct _IRP* Irp
 ) {
+	IoCopyCurrentIrpStackLocationToNext(Irp);
 
+	IoSetCompletionRoutine(Irp, MyCompletionRoutine, NULL, TRUE, TRUE, TRUE);
+
+	NTSTATUS status = IoCallDriver(((MY_EXTENSION*)deviceObject->DeviceExtension)->lowerDeviceObject, Irp);
+	return status;
 }
-
-typedef struct _MY_EXTENSION {
-	PDEVICE_OBJECT lowerDeviceObject;
-}MY_EXTENSION;
 
 NTSTATUS AttachToDevice(PDEVICE_OBJECT SourceDevice)
 {
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "AttachToDevice is start\n"));
 	NTSTATUS status = STATUS_SUCCESS;
-
+	UNICODE_STRING KbdDeviceName = RTL_CONSTANT_STRING(L"\\Device\\KeyboardClass0");
+	status = IoAttachDevice(deviceObject, &KbdDeviceName, &((MY_EXTENSION*)deviceObject->DeviceExtension)->lowerDeviceObject);
+	if (NT_SUCCESS(status)) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "AttachToDevice is success\n"));
+	}
+	else {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "AttachToDevice is failed\n"));
+	}
 	return status;
 }
 
