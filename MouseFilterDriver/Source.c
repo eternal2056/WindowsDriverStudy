@@ -181,7 +181,7 @@ Unload(
 
 	CleanUP(DriverObject->DeviceObject);
 
-	CancelPendingIrp();
+	//CancelPendingIrp();
 
 	//等待所有的IRP 完成    
 	while (gFilterData.ListHead.Next)
@@ -285,7 +285,7 @@ MyRead(
 	PPENDING_IRP_LIST PendingList = NULL;
 	PIO_STACK_LOCATION irpSp = IoGetCurrentIrpStackLocation(Irp);
 
-	//KdPrint(("MyRead Irp= 0x%p ", Irp)); 
+	KdPrint(("MyRead Irp= 0x%p ", Irp));
 
 	PendingList = (PPENDING_IRP_LIST)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDING_IRP_LIST), POOL_TAG);
 
