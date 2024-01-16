@@ -5,6 +5,7 @@
 // Kbdclass驱动的名字
 #define KBD_DRIVER_NAME  L"\\Driver\\mouclass"
 
+// 这个是故意跟 _DEVOBJ_EXTENSION 结构一样写的, 尤其是 pFilterDeviceObject 和 TargetDeviceObject
 typedef struct _C2P_DEV_EXT
 {
 	// 这个结构的大小
@@ -133,6 +134,7 @@ c2pAttachDevices(
 		// 2023年11月4日13:40:38 | 把设备对象插入到他们的设备对象栈中，然后到时候irp来的时候就可以经过我们的设备对象了。
 		// 2023年11月4日13:55:29 | 返回的是最底层的设备，这是函数功能。
 		// 2023年11月4日13:57:49 | 附加后应该是 SourceDevice->TargetDevice->LowerDevice 这样的结构，本来是 TargetDevice->LowerDevice
+		KdBreakPoint();
 		pLowerDeviceObject = IoAttachDeviceToDeviceStack(pFilterDeviceObject, pTargetDeviceObject);
 		// 如果绑定失败了，放弃之前的操作，退出。
 		if (!pLowerDeviceObject)
@@ -275,7 +277,6 @@ NTSTATUS c2pPnP(
 	// 获得真实设备。
 	devExt = (PC2P_DEV_EXT)(DeviceObject->DeviceExtension);
 	irpStack = IoGetCurrentIrpStackLocation(Irp);
-
 	switch (irpStack->MinorFunction)
 	{
 	case IRP_MN_REMOVE_DEVICE:
@@ -285,7 +286,7 @@ NTSTATUS c2pPnP(
 		IoSkipCurrentIrpStackLocation(Irp);
 		IoCallDriver(devExt->LowerDeviceObject, Irp);
 		// 然后解除绑定。
-		IoDetachDevice(devExt->LowerDeviceObject);
+		IoDetachDevice(devExt->LowerDeviceObject); // 这里大概错了
 		// 删除我们自己生成的虚拟设备。
 		IoDeleteDevice(DeviceObject);
 		status = STATUS_SUCCESS;
