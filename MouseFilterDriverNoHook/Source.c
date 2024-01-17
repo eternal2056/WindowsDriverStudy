@@ -134,7 +134,7 @@ c2pAttachDevices(
 		// 2023年11月4日13:40:38 | 把设备对象插入到他们的设备对象栈中，然后到时候irp来的时候就可以经过我们的设备对象了。
 		// 2023年11月4日13:55:29 | 返回的是最底层的设备，这是函数功能。
 		// 2023年11月4日13:57:49 | 附加后应该是 SourceDevice->TargetDevice->LowerDevice 这样的结构，本来是 TargetDevice->LowerDevice
-		KdBreakPoint();
+		//KdBreakPoint();
 		pLowerDeviceObject = IoAttachDeviceToDeviceStack(pFilterDeviceObject, pTargetDeviceObject);
 		// 如果绑定失败了，放弃之前的操作，退出。
 		if (!pLowerDeviceObject)
@@ -313,7 +313,7 @@ NTSTATUS c2pReadComplete(
 	PUCHAR buf = NULL;
 	size_t i;
 
-	IrpSp = IoGetCurrentIrpStackLocation(Irp);
+	//IrpSp = IoGetCurrentIrpStackLocation(Irp); // 没用
 
 	//  如果这个请求是成功的。很显然，如果请求失败了，这么获取
 	//   进一步的信息是没意义的。
@@ -351,8 +351,8 @@ NTSTATUS c2pDispatchRead(
 	PC2P_DEV_EXT devExt;
 	PIO_STACK_LOCATION currentIrpStack;
 	KEVENT waitEvent;
-	KeInitializeEvent(&waitEvent, NotificationEvent, FALSE);
-
+	//KeInitializeEvent(&waitEvent, NotificationEvent, FALSE); // 没用
+	//KdBreakPoint();
 	if (Irp->CurrentLocation == 1)
 	{
 		ULONG ReturnedInformation = 0;
@@ -373,7 +373,7 @@ NTSTATUS c2pDispatchRead(
 
 	// 设置回调函数并把IRP传递下去。 之后读的处理也就结束了。
 	// 剩下的任务是要等待读请求完成。
-	currentIrpStack = IoGetCurrentIrpStackLocation(Irp);
+	//currentIrpStack = IoGetCurrentIrpStackLocation(Irp); // 没用
 	IoCopyCurrentIrpStackLocationToNext(Irp);
 	IoSetCompletionRoutine(Irp, c2pReadComplete,
 		DeviceObject, TRUE, TRUE, TRUE);
