@@ -145,7 +145,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DPMain.c" />
-    <ClCompile Include="Source.c" />
+    <ClCompile Include="DPBitmap.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DPBitmap.h" />

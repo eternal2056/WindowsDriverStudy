@@ -22,7 +22,7 @@
     <ClCompile Include="DPMain.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source.c">
+    <ClCompile Include="DPBitmap.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
