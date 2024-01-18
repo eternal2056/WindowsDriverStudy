@@ -13,6 +13,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MouseFilterDriver", "MouseF
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MouseFilterDriverNoHook", "MouseFilterDriverNoHook\MouseFilterDriverNoHook.vcxproj", "{420AD359-6EA7-4A1A-B569-5FD62B974F67}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DiskDriverFilter", "DiskDriverFilter\DiskDriverFilter.vcxproj", "{7AED220D-422C-4871-B580-237CC2C13923}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -133,6 +135,30 @@ Global
 		{420AD359-6EA7-4A1A-B569-5FD62B974F67}.Release|x86.ActiveCfg = Release|Win32
 		{420AD359-6EA7-4A1A-B569-5FD62B974F67}.Release|x86.Build.0 = Release|Win32
 		{420AD359-6EA7-4A1A-B569-5FD62B974F67}.Release|x86.Deploy.0 = Release|Win32
+		{7AED220D-422C-4871-B580-237CC2C13923}.Debug|ARM.ActiveCfg = Debug|ARM
+		{7AED220D-422C-4871-B580-237CC2C13923}.Debug|ARM.Build.0 = Debug|ARM
+		{7AED220D-422C-4871-B580-237CC2C13923}.Debug|ARM.Deploy.0 = Debug|ARM
+		{7AED220D-422C-4871-B580-237CC2C13923}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{7AED220D-422C-4871-B580-237CC2C13923}.Debug|ARM64.Build.0 = Debug|ARM64
+		{7AED220D-422C-4871-B580-237CC2C13923}.Debug|ARM64.Deploy.0 = Debug|ARM64
+		{7AED220D-422C-4871-B580-237CC2C13923}.Debug|x64.ActiveCfg = Debug|x64
+		{7AED220D-422C-4871-B580-237CC2C13923}.Debug|x64.Build.0 = Debug|x64
+		{7AED220D-422C-4871-B580-237CC2C13923}.Debug|x64.Deploy.0 = Debug|x64
+		{7AED220D-422C-4871-B580-237CC2C13923}.Debug|x86.ActiveCfg = Debug|Win32
+		{7AED220D-422C-4871-B580-237CC2C13923}.Debug|x86.Build.0 = Debug|Win32
+		{7AED220D-422C-4871-B580-237CC2C13923}.Debug|x86.Deploy.0 = Debug|Win32
+		{7AED220D-422C-4871-B580-237CC2C13923}.Release|ARM.ActiveCfg = Release|ARM
+		{7AED220D-422C-4871-B580-237CC2C13923}.Release|ARM.Build.0 = Release|ARM
+		{7AED220D-422C-4871-B580-237CC2C13923}.Release|ARM.Deploy.0 = Release|ARM
+		{7AED220D-422C-4871-B580-237CC2C13923}.Release|ARM64.ActiveCfg = Release|ARM64
+		{7AED220D-422C-4871-B580-237CC2C13923}.Release|ARM64.Build.0 = Release|ARM64
+		{7AED220D-422C-4871-B580-237CC2C13923}.Release|ARM64.Deploy.0 = Release|ARM64
+		{7AED220D-422C-4871-B580-237CC2C13923}.Release|x64.ActiveCfg = Release|x64
+		{7AED220D-422C-4871-B580-237CC2C13923}.Release|x64.Build.0 = Release|x64
+		{7AED220D-422C-4871-B580-237CC2C13923}.Release|x64.Deploy.0 = Release|x64
+		{7AED220D-422C-4871-B580-237CC2C13923}.Release|x86.ActiveCfg = Release|Win32
+		{7AED220D-422C-4871-B580-237CC2C13923}.Release|x86.Build.0 = Release|Win32
+		{7AED220D-422C-4871-B580-237CC2C13923}.Release|x86.Deploy.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
