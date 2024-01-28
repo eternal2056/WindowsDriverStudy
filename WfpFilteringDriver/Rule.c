@@ -116,3 +116,36 @@ BOOLEAN IsHitRule(ULONG ulRemoteIPAddress)
 	return bIsHit;
 
 }
+BOOLEAN IsHitRulePort(ULONG wRemotePort)
+{
+	BOOLEAN bIsHit = FALSE;
+	do
+	{
+
+		KIRQL	OldIRQL = 0;
+		PLIST_ENTRY	pEntry = NULL;
+		if (g_WfpRuleList.Blink == NULL ||
+			g_WfpRuleList.Flink == NULL)
+		{
+			DbgPrint("q");
+			break;
+		}
+
+		KeAcquireSpinLock(&g_RuleLock, &OldIRQL);
+		pEntry = g_WfpRuleList.Flink;
+		while (pEntry != &g_WfpRuleList)
+		{
+			PST_WFP_NETINFOLIST pInfo = CONTAINING_RECORD(pEntry, ST_WFP_NETINFOLIST, m_linkPointer);
+
+			if (wRemotePort == pInfo->m_stWfpNetInfo.m_uRemotePort)
+			{
+				bIsHit = TRUE;
+				break;
+			}
+			pEntry = pEntry->Flink;
+		}
+		KeReleaseSpinLock(&g_RuleLock, OldIRQL);
+	} while (FALSE);
+	return bIsHit;
+
+}

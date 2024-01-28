@@ -32,3 +32,5 @@ BOOLEAN UninitRuleInfo();
 BOOLEAN AddNetRuleInfo(PVOID pRuleInfo, ULONG uLen);
 
 BOOLEAN IsHitRule(ULONG uRemotePort);
+
+BOOLEAN IsHitRulePort(ULONG wRemotePort);

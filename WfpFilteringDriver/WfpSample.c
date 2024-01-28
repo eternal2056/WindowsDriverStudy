@@ -91,6 +91,7 @@ NTSTATUS WfpSampleIRPDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 		{
 		case IOCTL_WFP_SAMPLE_ADD_RULE:
 		{
+			DbgBreakPoint();
 			BOOLEAN bSucc = FALSE;
 			bSucc = AddNetRuleInfo(pSystemBuffer, uInLen);
 			if (bSucc == FALSE)
@@ -392,7 +393,7 @@ VOID NTAPI Wfp_Sample_Established_ClassifyFn_V4(
 
 
 {
-	DbgBreakPoint();
+	//DbgBreakPoint();
 	WORD	wDirection = 0;
 	WORD	wRemotePort = 0;
 	WORD	wSrcPort = 0;
@@ -417,7 +418,8 @@ VOID NTAPI Wfp_Sample_Established_ClassifyFn_V4(
 
 	//ulRemoteIPAddress 表示远端IP
 	ulRemoteIPAddress = inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
-	DbgPrint("remote ip is %x\n", ulRemoteIPAddress);
+	DbgPrint("remote ip   is %x\n", ulRemoteIPAddress);
+	DbgPrint("remote port is %x\n", wRemotePort);
 
 	//wProtocol表示网络协议，可以取值是IPPROTO_ICMP/IPPROTO_UDP/IPPROTO_TCP
 	wProtocol = inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_PROTOCOL].value.uint8;
@@ -427,6 +429,10 @@ VOID NTAPI Wfp_Sample_Established_ClassifyFn_V4(
 
 
 	if (IsHitRule(ulRemoteIPAddress))
+	{
+		classifyOut->actionType = FWP_ACTION_BLOCK;
+	}
+	if (IsHitRulePort(wRemotePort))
 	{
 		classifyOut->actionType = FWP_ACTION_BLOCK;
 	}
