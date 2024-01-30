@@ -1,4 +1,4 @@
-﻿#include "ntddk.h"
+﻿#include "ntifs.h"
 
 #include "fwpmk.h"
 #include "fwpsk.h"
@@ -7,6 +7,7 @@
 #include "WfpSample.h"
 //#include "Fwpmu.h"
 #include "Rule.h"
+#include "FileMiniFilterDriver.h"
 
 /*
 本例子只是为了介绍WFP的用法，在实际应用中，如果只是根据简单的规则拦截数据包的话，
@@ -22,7 +23,7 @@ UINT64 g_uEstablishedFilterId = 0;
 
 HANDLE	g_hEngine = NULL;
 
-NTSTATUS DriverEntry(__in struct _DRIVER_OBJECT* DriverObject, __in PUNICODE_STRING RegistryPath)
+NTSTATUS WfpDriverEntry(__in struct _DRIVER_OBJECT* DriverObject, __in PUNICODE_STRING RegistryPath)
 {
 	DbgBreakPoint();
 	NTSTATUS nStatus = STATUS_UNSUCCESSFUL;
@@ -58,6 +59,16 @@ NTSTATUS DriverEntry(__in struct _DRIVER_OBJECT* DriverObject, __in PUNICODE_STR
 		DeleteDevice();
 		UninitRuleInfo();
 	}
+	return nStatus;
+}
+
+NTSTATUS DriverEntry(__in struct _DRIVER_OBJECT* DriverObject, __in PUNICODE_STRING RegistryPath)
+{
+	DbgBreakPoint();
+	NTSTATUS nStatus = STATUS_UNSUCCESSFUL;
+	nStatus = WfpDriverEntry(DriverObject, RegistryPath);
+	nStatus = MiniFilterDriverEntry(DriverObject, RegistryPath);
+
 	return nStatus;
 }
 

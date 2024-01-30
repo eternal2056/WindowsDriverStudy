@@ -142,7 +142,7 @@
       <PreprocessorDefinitions>NDIS630;_WIN64;_AMD64_;AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>$(DDK_LIB_PATH)\NTOSKrnl.lib;$(DDK_LIB_PATH)\FwpKClnt.lib;$(DDK_LIB_PATH)\NetIO.lib;$(DDK_LIB_PATH)\NDIS.lib;$(DDK_LIB_PATH)\WDMSec.lib;$(SDK_LIB_PATH)\UUID.lib;%(AdditionalDependencies);$(KernelBufferOverflowLib);$(DDK_LIB_PATH)ntoskrnl.lib;$(DDK_LIB_PATH)hal.lib;$(DDK_LIB_PATH)wmilib.lib</AdditionalDependencies>
+      <AdditionalDependencies>fltLib.lib;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\km\x64\fltMgr.lib;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\km\x64\ntoskrnl.lib;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\km\x64\hal.lib;$(DDK_LIB_PATH)\NTOSKrnl.lib;$(DDK_LIB_PATH)\FwpKClnt.lib;$(DDK_LIB_PATH)\NetIO.lib;$(DDK_LIB_PATH)\NDIS.lib;$(DDK_LIB_PATH)\WDMSec.lib;$(SDK_LIB_PATH)\UUID.lib;%(AdditionalDependencies);$(KernelBufferOverflowLib);$(DDK_LIB_PATH)ntoskrnl.lib;$(DDK_LIB_PATH)hal.lib;$(DDK_LIB_PATH)wmilib.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -152,10 +152,12 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="FileMiniFilterDriver.c" />
     <ClCompile Include="Rule.c" />
     <ClCompile Include="WfpSample.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="FileMiniFilterDriver.h" />
     <ClInclude Include="Rule.h" />
     <ClInclude Include="WfpSample.h" />
   </ItemGroup>

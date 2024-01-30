@@ -30,12 +30,18 @@
     <ClCompile Include="Rule.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="FileMiniFilterDriver.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Rule.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="WfpSample.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FileMiniFilterDriver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
