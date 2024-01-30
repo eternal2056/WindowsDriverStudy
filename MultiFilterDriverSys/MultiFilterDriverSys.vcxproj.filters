@@ -19,7 +19,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <Inf Include="x.inf">
+    <Inf Include="MultiFilterDriverSys.inf">
       <Filter>Driver Files</Filter>
     </Inf>
   </ItemGroup>
