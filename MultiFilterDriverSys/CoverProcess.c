@@ -5,6 +5,7 @@ VOID CoverProcessDriverUnload(DRIVER_OBJECT* DriverObject) {
 
 	RtlInitUnicodeString(&symbolicLinkName, KILLRULE_DOSDEVICE_NAME); // 替换为实际链接名称
 	IoDeleteSymbolicLink(&symbolicLinkName);
+	DbgBreakPoint();
 	IoDeleteDevice(DriverObject->DeviceObject);
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "DriverUnload\n"));
 }
@@ -331,6 +332,8 @@ NTSTATUS CoverProcessDriverEntry(
 		0,
 		TRUE,
 		&deviceObject);
+	UNICODE_STRING DeviceName = GetDeviceObjectName(deviceObject);
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "CoverProcessDriverEntry %wZ\n", &DeviceName));
 	if (!NT_SUCCESS(status)) {
 		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Failed to create device (0x%X)\n", status));
 		return status;

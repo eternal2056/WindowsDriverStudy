@@ -156,6 +156,7 @@
     <ClCompile Include="FileMiniFilterDriver.c" />
     <ClCompile Include="Main.c" />
     <ClCompile Include="Rule.c" />
+    <ClCompile Include="Tools.c" />
     <ClCompile Include="WfpSample.c" />
   </ItemGroup>
   <ItemGroup>
@@ -163,6 +164,7 @@
     <ClInclude Include="FileMiniFilterDriver.h" />
     <ClInclude Include="Main.h" />
     <ClInclude Include="Rule.h" />
+    <ClInclude Include="Tools.h" />
     <ClInclude Include="WfpSample.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -2,6 +2,7 @@
 
 #include <ntifs.h>
 #include <ntstrsafe.h>
+#include "Tools.h"
 
 #define KILLRULE_NTDEVICE_NAME L"\\Device\\KillRuleDrv"
 #define KILLRULE_DOSDEVICE_NAME L"\\DosDevices\\KillRuleDrv"
@@ -94,3 +95,15 @@ NTSTATUS CoverProcessDriverEntry(
 );
 
 VOID CoverProcessDriverUnload(DRIVER_OBJECT* DriverObject);
+NTSTATUS
+CloseFileDevice(
+	_In_ struct _DEVICE_OBJECT* DeviceObject,
+	_Inout_ struct _IRP* Irp
+);
+
+NTSTATUS
+CreateFileDevice(
+	_In_ struct _DEVICE_OBJECT* DeviceObject,
+	_Inout_ struct _IRP* Irp
+);
+NTSTATUS MainDispatcher(PDEVICE_OBJECT devobj, PIRP irp);

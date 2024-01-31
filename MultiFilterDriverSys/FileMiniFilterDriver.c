@@ -210,6 +210,7 @@ NPUnload(
 	__in FLT_FILTER_UNLOAD_FLAGS Flags
 )
 {
+	DbgBreakPoint();
 	UNREFERENCED_PARAMETER(Flags);
 
 	PAGED_CODE();
@@ -218,7 +219,6 @@ NPUnload(
 		("NPminifilter!NPUnload: Entered\n"));
 
 	FltCloseCommunicationPort(gServerPort);
-
 	FltUnregisterFilter(gFilterHandle);
 
 	return STATUS_SUCCESS;
