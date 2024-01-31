@@ -154,12 +154,14 @@
   <ItemGroup>
     <ClCompile Include="CoverProcess.c" />
     <ClCompile Include="FileMiniFilterDriver.c" />
+    <ClCompile Include="Main.c" />
     <ClCompile Include="Rule.c" />
     <ClCompile Include="WfpSample.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoverProcess.h" />
     <ClInclude Include="FileMiniFilterDriver.h" />
+    <ClInclude Include="Main.h" />
     <ClInclude Include="Rule.h" />
     <ClInclude Include="WfpSample.h" />
   </ItemGroup>

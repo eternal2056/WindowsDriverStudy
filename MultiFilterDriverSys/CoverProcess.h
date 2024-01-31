@@ -92,3 +92,5 @@ NTSTATUS CoverProcessDriverEntry(
 	IN PDRIVER_OBJECT DriverObject,
 	IN PUNICODE_STRING RegistryPath
 );
+
+VOID CoverProcessDriverUnload(DRIVER_OBJECT* DriverObject);

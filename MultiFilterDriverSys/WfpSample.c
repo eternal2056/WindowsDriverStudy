@@ -1,14 +1,7 @@
-﻿#include "ntifs.h"
-
-#include "fwpmk.h"
-#include "fwpsk.h"
-#define INITGUID
-#include <guiddef.h>
-#include "WfpSample.h"
+﻿#include "WfpSample.h"
 //#include "Fwpmu.h"
 #include "Rule.h"
-#include "FileMiniFilterDriver.h"
-#include "CoverProcess.h"
+
 
 /*
 本例子只是为了介绍WFP的用法，在实际应用中，如果只是根据简单的规则拦截数据包的话，
@@ -35,6 +28,7 @@ NTSTATUS WfpDriverEntry(__in struct _DRIVER_OBJECT* DriverObject, __in PUNICODE_
 		{
 			break;
 		}
+		DriverObject->DriverUnload = WfpDriverUnload;
 		DriverObject->MajorFunction[IRP_MJ_CREATE] = WfpSampleIRPDispatch;
 		DriverObject->MajorFunction[IRP_MJ_CLOSE] = WfpSampleIRPDispatch;
 		DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = WfpSampleIRPDispatch;
@@ -51,7 +45,6 @@ NTSTATUS WfpDriverEntry(__in struct _DRIVER_OBJECT* DriverObject, __in PUNICODE_
 		{
 			break;
 		}
-		DriverObject->DriverUnload = WfpDriverUnload;
 		nStatus = STATUS_SUCCESS;
 	} while (FALSE);
 	if (nStatus != STATUS_SUCCESS)
@@ -60,17 +53,6 @@ NTSTATUS WfpDriverEntry(__in struct _DRIVER_OBJECT* DriverObject, __in PUNICODE_
 		DeleteDevice();
 		UninitRuleInfo();
 	}
-	return nStatus;
-}
-
-NTSTATUS DriverEntry(__in struct _DRIVER_OBJECT* DriverObject, __in PUNICODE_STRING RegistryPath)
-{
-	DbgBreakPoint();
-	NTSTATUS nStatus = STATUS_UNSUCCESSFUL;
-	nStatus = WfpDriverEntry(DriverObject, RegistryPath);
-	nStatus = MiniFilterDriverEntry(DriverObject, RegistryPath);
-	nStatus = CoverProcessDriverEntry(DriverObject, RegistryPath);
-
 	return nStatus;
 }
 

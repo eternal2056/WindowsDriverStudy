@@ -1,5 +1,9 @@
 ﻿#pragma once
-
+#include "ntifs.h"
+#include "fwpmk.h"
+#include "fwpsk.h"
+#define INITGUID
+#include <guiddef.h>
 
 #define FILTER_MAJOR_NDIS_VERSION   6
 
@@ -108,7 +112,7 @@ VOID UninitWfp();
 
 VOID DeleteDevice();
 
-
+NTSTATUS WfpDriverEntry(__in struct _DRIVER_OBJECT* DriverObject, __in PUNICODE_STRING RegistryPath);
 
 
 
