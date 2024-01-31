@@ -33,6 +33,9 @@
     <ClCompile Include="FileMiniFilterDriver.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CoverProcess.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Rule.h">
@@ -42,6 +45,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="FileMiniFilterDriver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CoverProcess.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

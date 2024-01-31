@@ -152,11 +152,13 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CoverProcess.c" />
     <ClCompile Include="FileMiniFilterDriver.c" />
     <ClCompile Include="Rule.c" />
     <ClCompile Include="WfpSample.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CoverProcess.h" />
     <ClInclude Include="FileMiniFilterDriver.h" />
     <ClInclude Include="Rule.h" />
     <ClInclude Include="WfpSample.h" />

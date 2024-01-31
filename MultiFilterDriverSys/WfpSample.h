@@ -38,7 +38,7 @@ DEFINE_GUID(WFP_SAMPLE_SUBLAYER_GUID,
 
 
 /*函数原型声明*/
-void  DriverUnload(__in struct _DRIVER_OBJECT* DriverObject);
+void  WfpDriverUnload(__in struct _DRIVER_OBJECT* DriverObject);
 
 PDEVICE_OBJECT	CreateDevice(__in struct _DRIVER_OBJECT* DriverObject);
 
