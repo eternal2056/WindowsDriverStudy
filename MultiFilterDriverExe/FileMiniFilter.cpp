@@ -21,21 +21,21 @@ CNPApp::~CNPApp()
 }
 bool CNPApp::LoadNPminifilterDll(void)
 {
-	m_hModule = LoadLibrary("FileMiniFilterUserDll.dll");
-	printf("USER: m_hModule: %p\n", m_hModule);
-	printf("USER: LoadNPminifilterDll\n");
-	if (m_hModule != NULL) {
-		printf("USER: LoadNPminifilterDll, FileMiniFilterUserDll: %p\n", GetModuleHandle("FileMiniFilterUserDll.dll"));
-		printf("USER: LoadNPminifilterDll, NPSendMessage: %p\n", GetProcAddress(::GetModuleHandle("FileMiniFilterUserDll.dll"), "NPSendMessage"));
-		printf("USER: LoadNPminifilterDll, InitialCommunicationPort: %p\n", GetProcAddress(::GetModuleHandle("FileMiniFilterUserDll.dll"), "InitialCommunicationPort"));
-		printf("USER: LoadNPminifilterDll, LoadLibraryA: %p\n", GetProcAddress(::GetModuleHandle("kernel32.dll"), "LoadLibraryA"));
-		pNPSendMessage = (int(__stdcall*)(PVOID)) GetProcAddress(GetModuleHandle("FileMiniFilterUserDll.dll"), "NPSendMessage");
-		printf("USER: LoadNPminifilterDll, pNPSendMessage: %p\n", pNPSendMessage);
-		if (!pNPSendMessage) {
-			return false;
-		}
-		return true;
-	}
+	//m_hModule = LoadLibrary("FileMiniFilterUserDll.dll");
+	//printf("USER: m_hModule: %p\n", m_hModule);
+	//printf("USER: LoadNPminifilterDll\n");
+	//if (m_hModule != NULL) {
+	//	printf("USER: LoadNPminifilterDll, FileMiniFilterUserDll: %p\n", GetModuleHandle("FileMiniFilterUserDll.dll"));
+	//	printf("USER: LoadNPminifilterDll, NPSendMessage: %p\n", GetProcAddress(::GetModuleHandle("FileMiniFilterUserDll.dll"), "NPSendMessage"));
+	//	printf("USER: LoadNPminifilterDll, InitialCommunicationPort: %p\n", GetProcAddress(::GetModuleHandle("FileMiniFilterUserDll.dll"), "InitialCommunicationPort"));
+	//	printf("USER: LoadNPminifilterDll, LoadLibraryA: %p\n", GetProcAddress(::GetModuleHandle("kernel32.dll"), "LoadLibraryA"));
+	//	pNPSendMessage = (int(__stdcall*)(PVOID)) GetProcAddress(GetModuleHandle("FileMiniFilterUserDll.dll"), "NPSendMessage");
+	//	printf("USER: LoadNPminifilterDll, pNPSendMessage: %p\n", pNPSendMessage);
+	//	if (!pNPSendMessage) {
+	//		return false;
+	//	}
+	//	return true;
+	//}
 	return false;
 }
 

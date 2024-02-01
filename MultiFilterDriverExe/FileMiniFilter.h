@@ -6,6 +6,7 @@
 #include "windows.h"
 #include <stdio.h>
 #include <FltUser.h>
+#include <iostream>
 
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "kernel32.lib")

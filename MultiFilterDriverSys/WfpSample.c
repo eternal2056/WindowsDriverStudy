@@ -86,9 +86,20 @@ NTSTATUS WfpSampleIRPDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 		{
 		case IOCTL_WFP_SAMPLE_ADD_RULE:
 		{
-			DbgBreakPoint();
+			//DbgBreakPoint();
 			BOOLEAN bSucc = FALSE;
 			bSucc = AddNetRuleInfo(pSystemBuffer, uInLen);
+			if (bSucc == FALSE)
+			{
+				nStatus = STATUS_UNSUCCESSFUL;
+			}
+			break;
+		}
+		case IOCTL_WFP_SAMPLE_REMOVE_RULE:
+		{
+			//DbgBreakPoint();
+			BOOLEAN bSucc = FALSE;
+			bSucc = UninitRuleInfo();
 			if (bSucc == FALSE)
 			{
 				nStatus = STATUS_UNSUCCESSFUL;
