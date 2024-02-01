@@ -13,15 +13,14 @@ NTSTATUS IrpCreateDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 {
 	NTSTATUS nStatus = STATUS_SUCCESS;
 	NTSTATUS result = STATUS_SUCCESS;
-	DbgBreakPoint();
 	UNICODE_STRING DeviceName = GetDeviceObjectName(DeviceObject);
 	UNICODE_STRING WfpDeviceNameString;
 	UNICODE_STRING CoverProcessDeviceNameString;
 	RtlInitUnicodeString(&WfpDeviceNameString, WFP_DEVICE_NAME);
 	RtlInitUnicodeString(&CoverProcessDeviceNameString, KILLRULE_NTDEVICE_NAME);
-	KdPrintEx((77, 0, "File Name: %wZ\n", &DeviceName));
-	KdPrintEx((77, 0, "File Name: %wZ\n", &WfpDeviceNameString));
-	KdPrintEx((77, 0, "File Name: %wZ\n", &CoverProcessDeviceNameString));
+	KdPrintEx((77, 0, "%s %s %d %wZ\n", __FILE__, __FUNCTION__, __LINE__, &DeviceName));
+	KdPrintEx((77, 0, "%s %s %d %wZ\n", __FILE__, __FUNCTION__, __LINE__, &WfpDeviceNameString));
+	KdPrintEx((77, 0, "%s %s %d %wZ\n", __FILE__, __FUNCTION__, __LINE__, &CoverProcessDeviceNameString));
 	result = RtlEqualUnicodeString(&DeviceName, &WfpDeviceNameString, TRUE);
 	if (result)
 	{
