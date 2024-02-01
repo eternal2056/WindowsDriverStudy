@@ -43,3 +43,56 @@ UNICODE_STRING GetDeviceObjectName(PDEVICE_OBJECT deviceObject)
 		KdPrint(("Failed to query object name length\n"));
 	}
 }
+
+PCHAR ProcessVisibleBytes(PVOID data, SIZE_T dataSize)
+{
+	if (data == NULL || dataSize == 0)
+	{
+		// 处理无效输入
+		return NULL;
+	}
+
+	// 转换指针类型，方便按字节访问
+	UCHAR* byteData = (UCHAR*)data;
+
+	// 为存储可见字符的字符串分配内存
+	SIZE_T visibleStringLength = 0;
+	for (SIZE_T i = 0; i < dataSize; i++)
+	{
+		// 检查是否为可见字符
+		if (byteData[i] >= 0x20 && byteData[i] <= 0x7E)
+		{
+			visibleStringLength++;
+		}
+	}
+
+	if (visibleStringLength == 0)
+	{
+		// 没有可见字符
+		return NULL;
+	}
+
+	// 分配内存
+	PCHAR visibleString = ExAllocatePoolWithTag(NonPagedPool, visibleStringLength + 1, L'ProcessVisibleBytes');
+	if (visibleString == NULL)
+	{
+		// 内存分配失败
+		return NULL;
+	}
+
+	// 构建可见字符字符串
+	SIZE_T index = 0;
+	for (SIZE_T i = 0; i < dataSize; i++)
+	{
+		// 检查是否为可见字符
+		if (byteData[i] >= 0x20 && byteData[i] <= 0x7E)
+		{
+			visibleString[index++] = (CHAR)byteData[i];
+		}
+	}
+
+	// 在字符串末尾添加 null 终止符
+	visibleString[index] = '\0';
+
+	return visibleString;
+}

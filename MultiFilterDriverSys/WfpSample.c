@@ -1,6 +1,7 @@
 ﻿#include "WfpSample.h"
 //#include "Fwpmu.h"
 #include "Rule.h"
+#include "Tools.h"
 
 
 /*
@@ -600,12 +601,14 @@ VOID NTAPI Wfp_Sample_Stream_ClassifyFn_V4(
 			streamLength,
 			&bytesCopied);
 		// 检查 streamData 是否为 NULL
-		KdPrintEx((77, 0, "%s %s %d %d %s\n", __FILE__, __FUNCTION__, __LINE__, streamLength, stream));
-		//"flowData->nCurPid",
-		//"flowData->localAddressV4, flowData->localPort",
-		//"flowData->remoteAddressV4, flowData->remotePort",
-		//"flowData->ipProto",
-		ExFreePoolWithTag(stream, TAG_NAME_NOTIFY);
+		PCHAR visibleString = ProcessVisibleBytes(stream, streamLength);
+		KdPrintEx((77, 0, "%s %s %d %d %s\n", __FILE__, __FUNCTION__, __LINE__, streamLength, visibleString));
+		if (visibleString != NULL) {
+			if (strstr(visibleString, "bilibili") != NULL) {
+				classifyOut->actionType = FWP_ACTION_BLOCK;
+			}
+			ExFreePoolWithTag(visibleString, L"ProcessVisibleBytes");
+		}
 	}
 
 	//清除FWPS_RIGHT_ACTION_WRITE标记
