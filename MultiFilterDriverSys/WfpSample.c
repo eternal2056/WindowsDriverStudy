@@ -10,10 +10,12 @@
 PDEVICE_OBJECT g_pDeviceObj = NULL;
 
 UINT32	g_uFwpsEstablishedCallOutId = 0;
-
 UINT32	g_uFwpmEstablishedCallOutId = 0;
-
 UINT64 g_uEstablishedFilterId = 0;
+
+UINT32	g_uFwpsStreamCallOutId = 0;
+UINT32	g_uFwpmStreamCallOutId = 0;
+UINT64 g_uStreamFilterId = 0;
 
 HANDLE	g_hEngine = NULL;
 
@@ -87,6 +89,7 @@ NTSTATUS WfpSampleIRPDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 		case IOCTL_WFP_SAMPLE_ADD_RULE:
 		{
 			//DbgBreakPoint();
+			KdPrintEx((77, 0, "%s %s %d\n", __FILE__, __FUNCTION__, __LINE__));
 			BOOLEAN bSucc = FALSE;
 			bSucc = AddNetRuleInfo(pSystemBuffer, uInLen);
 			if (bSucc == FALSE)
@@ -171,13 +174,28 @@ NTSTATUS InitWfp()
 		{
 			break;
 		}
+		////添加呼出接口
+		if (STATUS_SUCCESS != WfpAddCalloutsStream())
+		{
+			break;
+		}
 		//添加子层
 		if (STATUS_SUCCESS != WfpAddSubLayer())
 		{
 			break;
 		}
+		////添加子层
+		if (STATUS_SUCCESS != WfpAddSubLayerStream())
+		{
+			break;
+		}
 		//添加过滤引擎
 		if (STATUS_SUCCESS != WfpAddFilters())
+		{
+			break;
+		}
+		//添加过滤引擎
+		if (STATUS_SUCCESS != WfpAddFiltersStream())
 		{
 			break;
 		}
@@ -269,6 +287,18 @@ NTSTATUS WfpRegisterCallouts(IN OUT void* deviceObject)
 		{
 			break;
 		}
+		//注册呼出接口
+		status = WfpRegisterCalloutImple(deviceObject,
+			Wfp_Sample_Stream_ClassifyFn_V4,
+			Wfp_Sample_Established_NotifyFn_V4,
+			Wfp_Sample_Established_FlowDeleteFn_V4,
+			&WFP_SAMPLE_STREAM_CALLOUT_V4_GUID,
+			0,
+			&g_uFwpsStreamCallOutId);
+		if (status != STATUS_SUCCESS)
+		{
+			break;
+		}
 		status = STATUS_SUCCESS;
 	} while (FALSE);
 	return status;
@@ -278,6 +308,8 @@ VOID WfpUnRegisterCallouts()
 {
 	FwpsCalloutUnregisterById(g_uFwpsEstablishedCallOutId);
 	g_uFwpsEstablishedCallOutId = 0;
+	FwpsCalloutUnregisterById(g_uFwpsStreamCallOutId);
+	g_uFwpsStreamCallOutId = 0;
 }
 
 
@@ -305,6 +337,30 @@ NTSTATUS WfpAddCallouts()
 	} while (FALSE);
 	return status;
 }
+NTSTATUS WfpAddCalloutsStream()
+{
+	NTSTATUS status = STATUS_SUCCESS;
+	FWPM_CALLOUT fwpmCallout = { 0 };
+	fwpmCallout.flags = 0;
+	do
+	{
+		if (g_hEngine == NULL)
+		{
+			break;
+		}
+		fwpmCallout.displayData.name = (wchar_t*)WFP_SAMPLE_STREAM_CALLOUT_DISPLAY_NAME;
+		fwpmCallout.displayData.description = (wchar_t*)WFP_SAMPLE_STREAM_CALLOUT_DISPLAY_NAME;
+		fwpmCallout.calloutKey = WFP_SAMPLE_STREAM_CALLOUT_V4_GUID;
+		fwpmCallout.applicableLayer = FWPM_LAYER_STREAM_V4;
+		status = FwpmCalloutAdd(g_hEngine, &fwpmCallout, NULL, &g_uFwpmStreamCallOutId);
+		if (!NT_SUCCESS(status) && (status != STATUS_FWP_ALREADY_EXISTS))
+		{
+			break;
+		}
+		status = STATUS_SUCCESS;
+	} while (FALSE);
+	return status;
+}
 
 VOID WfpRemoveCallouts()
 {
@@ -312,6 +368,8 @@ VOID WfpRemoveCallouts()
 	{
 		FwpmCalloutDeleteById(g_hEngine, g_uFwpmEstablishedCallOutId);
 		g_uFwpmEstablishedCallOutId = 0;
+		FwpmCalloutDeleteById(g_hEngine, g_uFwpmStreamCallOutId);
+		g_uFwpmStreamCallOutId = 0;
 	}
 
 }
@@ -330,7 +388,21 @@ NTSTATUS WfpAddSubLayer()
 		nStatus = FwpmSubLayerAdd(g_hEngine, &SubLayer, NULL);
 	}
 	return nStatus;
-
+}
+NTSTATUS WfpAddSubLayerStream()
+{
+	NTSTATUS nStatus = STATUS_UNSUCCESSFUL;
+	FWPM_SUBLAYER SubLayer = { 0 };
+	SubLayer.flags = 0;
+	SubLayer.displayData.description = WFP_SAMPLE_STREAM_SUB_LAYER_DISPLAY_NAME;
+	SubLayer.displayData.name = WFP_SAMPLE_STREAM_SUB_LAYER_DISPLAY_NAME;
+	SubLayer.subLayerKey = WFP_SAMPLE_STREAM_SUBLAYER_GUID;
+	SubLayer.weight = 65535;
+	if (g_hEngine != NULL)
+	{
+		nStatus = FwpmSubLayerAdd(g_hEngine, &SubLayer, NULL);
+	}
+	return nStatus;
 }
 
 VOID WfpRemoveSubLayer()
@@ -338,6 +410,7 @@ VOID WfpRemoveSubLayer()
 	if (g_hEngine != NULL)
 	{
 		FwpmSubLayerDeleteByKey(g_hEngine, &WFP_SAMPLE_SUBLAYER_GUID);
+		FwpmSubLayerDeleteByKey(g_hEngine, &WFP_SAMPLE_STREAM_SUBLAYER_GUID);
 	}
 }
 
@@ -348,6 +421,7 @@ NTSTATUS WfpAddFilters()
 	do
 	{
 		FWPM_FILTER0 Filter = { 0 };
+		FWPM_FILTER0 FilterNew = { 0 };
 		FWPM_FILTER_CONDITION FilterCondition[1] = { 0 };
 		FWP_V4_ADDR_AND_MASK AddrAndMask = { 0 };
 		if (g_hEngine == NULL)
@@ -364,12 +438,47 @@ NTSTATUS WfpAddFilters()
 		Filter.filterCondition = FilterCondition;
 		Filter.action.type = FWP_ACTION_CALLOUT_TERMINATING;
 		Filter.action.calloutKey = WFP_SAMPLE_ESTABLISHED_CALLOUT_V4_GUID;
-
 		FilterCondition[0].fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
 		FilterCondition[0].matchType = FWP_MATCH_EQUAL;
 		FilterCondition[0].conditionValue.type = FWP_V4_ADDR_MASK;//要检测的类型
 		FilterCondition[0].conditionValue.v4AddrMask = &AddrAndMask;//要检测的值
 		nStatus = FwpmFilterAdd(g_hEngine, &Filter, NULL, &g_uEstablishedFilterId);
+		if (STATUS_SUCCESS != nStatus)
+		{
+			break;
+		}
+		nStatus = STATUS_SUCCESS;
+	} while (FALSE);
+	return nStatus;
+}
+NTSTATUS WfpAddFiltersStream()
+{
+	NTSTATUS nStatus = STATUS_UNSUCCESSFUL;
+	do
+	{
+		FWPM_FILTER0 Filter = { 0 };
+		FWPM_FILTER0 FilterNew = { 0 };
+		FWPM_FILTER_CONDITION FilterCondition[1] = { 0 };
+		FWP_V4_ADDR_AND_MASK AddrAndMask = { 0 };
+		if (g_hEngine == NULL)
+		{
+			break;
+		}
+		Filter.displayData.description = WFP_SAMPLE_FILTER_STREAM_DISPLAY_NAME;
+		Filter.displayData.name = WFP_SAMPLE_FILTER_STREAM_DISPLAY_NAME;
+		Filter.flags = 0;
+		Filter.layerKey = FWPM_LAYER_STREAM_V4;
+		Filter.subLayerKey = WFP_SAMPLE_STREAM_SUBLAYER_GUID;
+		Filter.weight.type = FWP_EMPTY;
+		Filter.numFilterConditions = 1;
+		Filter.filterCondition = FilterCondition;
+		Filter.action.type = FWP_ACTION_CALLOUT_TERMINATING;
+		Filter.action.calloutKey = WFP_SAMPLE_STREAM_CALLOUT_V4_GUID;
+		FilterCondition[0].fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
+		FilterCondition[0].matchType = FWP_MATCH_EQUAL;
+		FilterCondition[0].conditionValue.type = FWP_V4_ADDR_MASK;//要检测的类型
+		FilterCondition[0].conditionValue.v4AddrMask = &AddrAndMask;//要检测的值
+		nStatus = FwpmFilterAdd(g_hEngine, &Filter, NULL, &g_uStreamFilterId);
 		if (STATUS_SUCCESS != nStatus)
 		{
 			break;
@@ -384,6 +493,7 @@ VOID WfpRemoveFilters()
 	if (g_hEngine != NULL)
 	{
 		FwpmFilterDeleteById(g_hEngine, g_uEstablishedFilterId);
+		FwpmFilterDeleteById(g_hEngine, g_uStreamFilterId);
 	}
 }
 
@@ -443,6 +553,60 @@ VOID NTAPI Wfp_Sample_Established_ClassifyFn_V4(
 		classifyOut->actionType = FWP_ACTION_BLOCK;
 	}
 
+	//清除FWPS_RIGHT_ACTION_WRITE标记
+	if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT)
+	{
+		classifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
+	}
+	return;
+}
+
+VOID NTAPI Wfp_Sample_Stream_ClassifyFn_V4(
+	IN const FWPS_INCOMING_VALUES0* inFixedValues,
+	IN const FWPS_INCOMING_METADATA_VALUES0* inMetaValues,
+	IN OUT VOID* layerData,
+	IN OPTIONAL const void* classifyContext,
+	IN const FWPS_FILTER3* filter,
+	IN UINT64  flowContext,
+	OUT FWPS_CLASSIFY_OUT0* classifyOut
+)
+
+
+{
+	// FWPM_LAYER_STREAM_V4
+	// DbgBreakPoint();
+	// 默认"允许"(PERMIT)
+	classifyOut->actionType = FWP_ACTION_PERMIT;
+
+	FWPS_STREAM_CALLOUT_IO_PACKET* streamPacket = (FWPS_STREAM_CALLOUT_IO_PACKET*)layerData;
+	if (streamPacket != NULL && streamPacket->streamData != NULL &&
+		streamPacket->streamData->dataLength != 0)
+	{
+		//DbgBreakPoint();
+		////得到数据流指针
+		FWPS_STREAM_DATA0* streamBuffer = streamPacket->streamData;
+
+		BYTE* stream = NULL;
+#define TAG_NAME_NOTIFY 'oNnM'
+		SIZE_T streamLength = streamBuffer->dataLength;
+		SIZE_T bytesCopied = 0;
+		stream = (BYTE*)ExAllocatePoolWithTag(NonPagedPool,
+			streamLength + 4,
+			TAG_NAME_NOTIFY);
+		RtlZeroMemory(stream, streamLength + 4);
+		FwpsCopyStreamDataToBuffer0(
+			streamBuffer,
+			stream,
+			streamLength,
+			&bytesCopied);
+		// 检查 streamData 是否为 NULL
+		KdPrintEx((77, 0, "%s %s %d %d %s\n", __FILE__, __FUNCTION__, __LINE__, streamLength, stream));
+		//"flowData->nCurPid",
+		//"flowData->localAddressV4, flowData->localPort",
+		//"flowData->remoteAddressV4, flowData->remotePort",
+		//"flowData->ipProto",
+		ExFreePoolWithTag(stream, TAG_NAME_NOTIFY);
+	}
 
 	//清除FWPS_RIGHT_ACTION_WRITE标记
 	if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT)
