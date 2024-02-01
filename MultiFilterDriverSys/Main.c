@@ -13,17 +13,22 @@ NTSTATUS IrpCreateDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 {
 	NTSTATUS nStatus = STATUS_SUCCESS;
 	NTSTATUS result = STATUS_SUCCESS;
+	DbgBreakPoint();
 	UNICODE_STRING DeviceName = GetDeviceObjectName(DeviceObject);
-	//UNICODE_STRING WfpDeviceNameString;
-	//RtlInitUnicodeString(&WfpDeviceNameString, WFP_DEVICE_NAME);
-	KdPrint(("File Name: %wZ\n", &DeviceName));
-	result = RtlCompareUnicodeString(&DeviceName, &WFP_DEVICE_NAME, TRUE);
-	if (NT_SUCCESS(result))
+	UNICODE_STRING WfpDeviceNameString;
+	UNICODE_STRING CoverProcessDeviceNameString;
+	RtlInitUnicodeString(&WfpDeviceNameString, WFP_DEVICE_NAME);
+	RtlInitUnicodeString(&CoverProcessDeviceNameString, KILLRULE_NTDEVICE_NAME);
+	KdPrintEx((77, 0, "File Name: %wZ\n", &DeviceName));
+	KdPrintEx((77, 0, "File Name: %wZ\n", &WfpDeviceNameString));
+	KdPrintEx((77, 0, "File Name: %wZ\n", &CoverProcessDeviceNameString));
+	result = RtlEqualUnicodeString(&DeviceName, &WfpDeviceNameString, TRUE);
+	if (result)
 	{
 		WfpSampleIRPDispatch(DeviceObject, Irp);
 	}
-	result = RtlCompareUnicodeString(&DeviceName, &KILLRULE_NTDEVICE_NAME, TRUE);
-	if (NT_SUCCESS(result))
+	result = RtlEqualUnicodeString(&DeviceName, &CoverProcessDeviceNameString, TRUE);
+	if (result)
 	{
 		CreateFileDevice(DeviceObject, Irp);
 	}
@@ -35,16 +40,23 @@ NTSTATUS IrpCloseDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 	NTSTATUS nStatus = STATUS_SUCCESS;
 	NTSTATUS result = STATUS_SUCCESS;
 	UNICODE_STRING DeviceName = GetDeviceObjectName(DeviceObject);
-	//UNICODE_STRING WfpDeviceNameString;
-	//RtlInitUnicodeString(&WfpDeviceNameString, WFP_DEVICE_NAME);
+
+	UNICODE_STRING WfpDeviceNameString;
+	UNICODE_STRING CoverProcessDeviceNameString;
+	RtlInitUnicodeString(&WfpDeviceNameString, WFP_DEVICE_NAME);
+	RtlInitUnicodeString(&CoverProcessDeviceNameString, KILLRULE_NTDEVICE_NAME);
+	KdPrintEx((77, 0, "File Name: %wZ\n", &DeviceName));
+	KdPrintEx((77, 0, "File Name: %wZ\n", &WfpDeviceNameString));
+	KdPrintEx((77, 0, "File Name: %wZ\n", &CoverProcessDeviceNameString));
+
 	KdPrint(("File Name: %wZ\n", &DeviceName));
-	result = RtlCompareUnicodeString(&DeviceName, &WFP_DEVICE_NAME, TRUE);
-	if (NT_SUCCESS(result))
+	result = RtlEqualUnicodeString(&DeviceName, &WfpDeviceNameString, TRUE);
+	if (result)
 	{
 		WfpSampleIRPDispatch(DeviceObject, Irp);
 	}
-	result = RtlCompareUnicodeString(&DeviceName, &KILLRULE_NTDEVICE_NAME, TRUE);
-	if (NT_SUCCESS(result))
+	result = RtlEqualUnicodeString(&DeviceName, &CoverProcessDeviceNameString, TRUE);
+	if (result)
 	{
 		CloseFileDevice(DeviceObject, Irp);
 	}
@@ -56,16 +68,23 @@ NTSTATUS IrpControlDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 	NTSTATUS nStatus = STATUS_SUCCESS;
 	NTSTATUS result = STATUS_SUCCESS;
 	UNICODE_STRING DeviceName = GetDeviceObjectName(DeviceObject);
-	//UNICODE_STRING WfpDeviceNameString;
-	//RtlInitUnicodeString(&WfpDeviceNameString, WFP_DEVICE_NAME);
-	KdPrint(("File Name: %wZ\n", &DeviceName));
-	result = RtlCompareUnicodeString(&DeviceName, &WFP_DEVICE_NAME, TRUE);
-	if (NT_SUCCESS(result))
+
+	UNICODE_STRING WfpDeviceNameString;
+	UNICODE_STRING CoverProcessDeviceNameString;
+	RtlInitUnicodeString(&WfpDeviceNameString, WFP_DEVICE_NAME);
+	RtlInitUnicodeString(&CoverProcessDeviceNameString, KILLRULE_NTDEVICE_NAME);
+	KdPrintEx((77, 0, "File Name: %wZ\n", &DeviceName));
+	KdPrintEx((77, 0, "File Name: %wZ\n", &WfpDeviceNameString));
+	KdPrintEx((77, 0, "File Name: %wZ\n", &CoverProcessDeviceNameString));
+
+	KdPrintEx((77, "File Name: %wZ\n", &DeviceName));
+	result = RtlEqualUnicodeString(&DeviceName, &WfpDeviceNameString, TRUE);
+	if (result)
 	{
 		WfpSampleIRPDispatch(DeviceObject, Irp);
 	}
-	result = RtlCompareUnicodeString(&DeviceName, &KILLRULE_NTDEVICE_NAME, TRUE);
-	if (NT_SUCCESS(result))
+	result = RtlEqualUnicodeString(&DeviceName, &CoverProcessDeviceNameString, TRUE);
+	if (result)
 	{
 		MainDispatcher(DeviceObject, Irp);
 	}
@@ -87,7 +106,7 @@ NTSTATUS DriverEntry(__in struct _DRIVER_OBJECT* DriverObject, __in PUNICODE_STR
 	nStatus = CoverProcessDriverEntry(DriverObject, RegistryPath);
 	DriverObject->DriverUnload = MainDriverUnload;
 	DriverObject->MajorFunction[IRP_MJ_CREATE] = IrpCreateDispatch;
-	DriverObject->MajorFunction[IRP_MJ_CLOSE] = IrpCreateDispatch;
+	DriverObject->MajorFunction[IRP_MJ_CLOSE] = IrpCloseDispatch;
 	DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = IrpControlDispatch;
 	return nStatus;
 }
