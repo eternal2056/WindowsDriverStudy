@@ -607,6 +607,9 @@ VOID NTAPI Wfp_Sample_Stream_ClassifyFn_V4(
 			if (strstr(visibleString, "bilibili") != NULL) {
 				classifyOut->actionType = FWP_ACTION_BLOCK;
 			}
+			if (strstr(visibleString, "youtube") != NULL) {
+				classifyOut->actionType = FWP_ACTION_BLOCK;
+			}
 			ExFreePoolWithTag(visibleString, L"ProcessVisibleBytes");
 		}
 	}
