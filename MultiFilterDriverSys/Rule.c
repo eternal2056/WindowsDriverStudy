@@ -44,6 +44,14 @@ BOOLEAN UninitRuleInfo()
 	return TRUE;
 }
 
+void InitializeAnsiString(CHAR* targetString, const CHAR* sourceString) {
+	// 使用字符串处理函数 strncpy 将 sourceString 复制到 targetString
+	strncpy(targetString, sourceString, sizeof(sourceString) + 1);
+
+	// 确保字符串以 null 结尾
+	targetString[sizeof(sourceString)] = '\0';
+}
+
 BOOLEAN AddNetRuleInfo(PVOID pBuf, ULONG uLen)
 {
 	BOOLEAN bSucc = FALSE;
@@ -73,6 +81,12 @@ BOOLEAN AddNetRuleInfo(PVOID pBuf, ULONG uLen)
 		pRuleNode->m_stWfpNetInfo.m_ulRemoteIPAddr = pRuleInfo->m_ulRemoteIPAddr;
 		pRuleNode->m_stWfpNetInfo.m_ulNetWorkType = pRuleInfo->m_ulNetWorkType;
 		pRuleNode->m_stWfpNetInfo.m_uDirection = pRuleInfo->m_uDirection;
+
+		pRuleNode->m_stWfpNetInfo.m_url = (PCHAR)ExAllocatePoolWithTag(
+			NonPagedPool, strlen(pRuleInfo->m_url) + 1, 'MySt');
+
+		if (pRuleNode->m_stWfpNetInfo.m_url) InitializeAnsiString(pRuleNode->m_stWfpNetInfo.m_url, pRuleInfo->m_url);
+
 		KeAcquireSpinLock(&g_RuleLock, &OldIRQL);
 		InsertHeadList(&g_WfpRuleList, &pRuleNode->m_linkPointer);
 		KeReleaseSpinLock(&g_RuleLock, OldIRQL);
@@ -148,4 +162,41 @@ BOOLEAN IsHitRulePort(ULONG wRemotePort)
 	} while (FALSE);
 	return bIsHit;
 
+}
+
+BOOLEAN IsHitRuleUrl(PCHAR visibleString) {
+	BOOLEAN bIsHit = FALSE;
+	do
+	{
+
+		KIRQL	OldIRQL = 0;
+		PLIST_ENTRY	pEntry = NULL;
+		if (g_WfpRuleList.Blink == NULL ||
+			g_WfpRuleList.Flink == NULL)
+		{
+			DbgPrint("q");
+			break;
+		}
+
+		KeAcquireSpinLock(&g_RuleLock, &OldIRQL);
+		pEntry = g_WfpRuleList.Flink;
+		while (pEntry != &g_WfpRuleList)
+		{
+			PST_WFP_NETINFOLIST pInfo = CONTAINING_RECORD(pEntry, ST_WFP_NETINFOLIST, m_linkPointer);
+
+
+			if (visibleString != NULL) {
+				if (pInfo->m_stWfpNetInfo.m_url != NULL) {
+					if (strstr(visibleString, pInfo->m_stWfpNetInfo.m_url) != NULL) {
+						bIsHit = TRUE;
+						break;
+					}
+				}
+			}
+
+			pEntry = pEntry->Flink;
+		}
+		KeReleaseSpinLock(&g_RuleLock, OldIRQL);
+	} while (FALSE);
+	return bIsHit;
 }

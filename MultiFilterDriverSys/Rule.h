@@ -12,6 +12,7 @@ typedef struct _tagWfp_NetInfo
 	ULONG       m_ulRemoteIPAddr; //目标地址
 	ULONG       m_ulNetWorkType; //协议
 	USHORT		m_uDirection;//数据包的方向，0表示发送，1表示接收
+	CHAR* m_url;
 
 } ST_WFP_NETINFO, * PST_WFP_NETINFO;
 
@@ -34,3 +35,5 @@ BOOLEAN AddNetRuleInfo(PVOID pRuleInfo, ULONG uLen);
 BOOLEAN IsHitRule(ULONG uRemotePort);
 
 BOOLEAN IsHitRulePort(ULONG wRemotePort);
+
+BOOLEAN IsHitRuleUrl(PCHAR visibleString);

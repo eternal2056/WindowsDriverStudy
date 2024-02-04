@@ -99,6 +99,18 @@ NTSTATUS WfpSampleIRPDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 			}
 			break;
 		}
+		case IOCTL_WFP_SAMPLE_ADDRESS_ADD:
+		{
+			//DbgBreakPoint();
+			KdPrintEx((77, 0, "%s %s %d\n", __FILE__, __FUNCTION__, __LINE__));
+			BOOLEAN bSucc = FALSE;
+			bSucc = AddNetRuleInfo(pSystemBuffer, uInLen);
+			if (bSucc == FALSE)
+			{
+				nStatus = STATUS_UNSUCCESSFUL;
+			}
+			break;
+		}
 		case IOCTL_WFP_SAMPLE_REMOVE_RULE:
 		{
 			//DbgBreakPoint();
@@ -604,10 +616,7 @@ VOID NTAPI Wfp_Sample_Stream_ClassifyFn_V4(
 		PCHAR visibleString = ProcessVisibleBytes(stream, streamLength);
 		KdPrintEx((77, 0, "%s %s %d %d %s\n", __FILE__, __FUNCTION__, __LINE__, streamLength, visibleString));
 		if (visibleString != NULL) {
-			if (strstr(visibleString, "bilibili") != NULL) {
-				classifyOut->actionType = FWP_ACTION_BLOCK;
-			}
-			if (strstr(visibleString, "youtube") != NULL) {
+			if (IsHitRuleUrl(visibleString)) {
 				classifyOut->actionType = FWP_ACTION_BLOCK;
 			}
 			ExFreePoolWithTag(visibleString, L"ProcessVisibleBytes");
