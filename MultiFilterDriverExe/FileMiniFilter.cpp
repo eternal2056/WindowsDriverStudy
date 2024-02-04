@@ -1,7 +1,7 @@
 ﻿#include "FileMiniFilter.h"
 #include <iostream>
 using namespace std;
-
+std::vector<std::string> forbidExeListTemp;
 int(__stdcall* pNPSendMessage)(PVOID pInBuffer);
 int(__stdcall* pInitialCommunicationPort)(VOID);
 
@@ -64,6 +64,17 @@ void FileMiniFilterMain(int argc, CHAR* argv[])
 		strcpy_s(data->FileName, param3.length() + 1, param3.c_str());
 		ControlObj.NPMessage(data);
 	}
+	if (param2 == "AddExeList") {
+
+		for (auto& forbidExe : forbidExeListTemp) {
+			COMMAND_MESSAGE* data = new COMMAND_MESSAGE;
+			*data = { 0 };
+			data->FileName = new char[forbidExe.length() + 1]; // +1 用于 null 终止符
+			strcpy_s(data->FileName, forbidExe.length() + 1, forbidExe.c_str());
+			ControlObj.NPMessage(data);
+		}
+	}
+
 	if (param2 == "RemoveRule") {
 		COMMAND_MESSAGE* data = new COMMAND_MESSAGE;
 		*data = { 0 };

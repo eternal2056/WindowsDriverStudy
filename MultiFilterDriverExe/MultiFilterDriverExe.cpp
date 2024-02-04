@@ -48,10 +48,13 @@ int main(int argc, CHAR* argv[]) {
 	char* buffer = new char[MAX_PATH];
 	GetCurrentDirectoryA(MAX_PATH, buffer);
 	std::cout << L"Current working directory: " << buffer << std::endl;
-	std::string bufferString = buffer;
-	bufferString += "\\WfpConfig.txt";
+	std::string directoryPath = buffer;
+	std::string WfpConfigPath = directoryPath + "\\WfpConfig.txt";
+	std::string MiniFilterConfigPath = directoryPath + "\\MiniFilterConfig.txt";
 	extern std::vector<std::string> forbidAddressListTemp;
-	readAndPrintFile(bufferString, forbidAddressListTemp);
+	readAndPrintFile(WfpConfigPath, forbidAddressListTemp);
+	extern std::vector<std::string> forbidExeListTemp;
+	readAndPrintFile(MiniFilterConfigPath, forbidExeListTemp);
 	//readAndPrintFile
 	int processId;
 	if (argc == 1) {
