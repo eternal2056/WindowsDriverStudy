@@ -37,3 +37,5 @@ BOOLEAN IsHitRule(ULONG uRemotePort);
 BOOLEAN IsHitRulePort(ULONG wRemotePort);
 
 BOOLEAN IsHitRuleUrl(PCHAR visibleString);
+
+void InitializeAnsiString(CHAR* targetString, const CHAR* sourceString);

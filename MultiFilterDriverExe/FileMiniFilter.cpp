@@ -39,7 +39,7 @@ bool CNPApp::LoadNPminifilterDll(void)
 	return false;
 }
 
-void CNPApp::NPMessage(COMMAND_MESSAGE data)
+void CNPApp::NPMessage(COMMAND_MESSAGE* data)
 {
 	//if (m_hModule == NULL) {
 	//	if (LoadNPminifilterDll() == false) {
@@ -47,39 +47,29 @@ void CNPApp::NPMessage(COMMAND_MESSAGE data)
 	//	}
 	//}
 	//printf("USER: NPMessage\n");
-	NPSendMessage((PVOID)(&data));
+	NPSendMessage((PVOID)(data));
 }
 
-void FileMiniFilterMain()
+void FileMiniFilterMain(int argc, CHAR* argv[])
 {
 	InitialCommunicationPort();
 	CNPApp ControlObj;
-	char input;
-	while (true) {
-		cout << "Enter 'a' for PASS MODE, 'b' for BLOCKMODE or 'q' to EXIT" << endl;
-		cin >> input;
-		if (input == 'a' || input == 'A') {
-			COMMAND_MESSAGE data;
-			data.Command = ENUM_PASS;
-			ControlObj.NPMessage(data);
-			printf("==>NOTEPAD.EXE PASS MODE\n");
-		}
-		else if (input == 'b' || input == 'B') {
-			COMMAND_MESSAGE data;
-			data.Command = ENUM_BLOCK;
-			ControlObj.NPMessage(data);
-			printf("==>NOTEPAD.EXE BLOCK MODE\n");
-		}
-		else if (input == 'q' || input == 'Q') {
-			printf("EXIT\n");
-			break;
-		}
-		else {
-			printf("Wrong Parameter!!!\n");
-		}
-	};
 
-	system("pause");
+	std::string param2 = argv[2];
+	if (param2 == "AddExe") {
+		COMMAND_MESSAGE* data = new COMMAND_MESSAGE;
+		*data = { 0 };
+		std::string param3 = argv[3];
+		data->FileName = new char[param3.length() + 1]; // +1 用于 null 终止符
+		strcpy_s(data->FileName, param3.length() + 1, param3.c_str());
+		ControlObj.NPMessage(data);
+	}
+	if (param2 == "RemoveRule") {
+		COMMAND_MESSAGE* data = new COMMAND_MESSAGE;
+		*data = { 0 };
+		data->Mode = ENUM_REMOVE_RULE;
+		ControlObj.NPMessage(data);
+	}
 }
 
 int InitialCommunicationPort(void)

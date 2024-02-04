@@ -21,17 +21,18 @@
 
 int InitialCommunicationPort(void);
 int NPSendMessage(PVOID InputBuffer);
-void FileMiniFilterMain();
+void FileMiniFilterMain(int argc, CHAR* argv[]);
 
 using namespace std;
 
 typedef enum _NPMINI_COMMAND {
-	ENUM_PASS = 0,
-	ENUM_BLOCK
+	ENUM_ADD_RULE = 0,
+	ENUM_REMOVE_RULE = 1,
 } NPMINI_COMMAND;
 
 typedef struct _COMMAND_MESSAGE {
-	NPMINI_COMMAND 	Command;
+	char* FileName;
+	NPMINI_COMMAND Mode;
 } COMMAND_MESSAGE, * PCOMMAND_MESSAGE;
 
 class CNPApp
@@ -39,7 +40,7 @@ class CNPApp
 public:
 	CNPApp();
 	virtual ~CNPApp();
-	void NPMessage(COMMAND_MESSAGE data);
+	void NPMessage(COMMAND_MESSAGE* data);
 
 private:
 	HINSTANCE m_hModule;

@@ -149,11 +149,29 @@ const static FLT_REGISTRATION FilterRegistration = {
 
 //  Defines the commands between the utility and the filter
 typedef enum _NPMINI_COMMAND {
-	ENUM_PASS = 0,
-	ENUM_BLOCK
+	ENUM_ADD_RULE = 0,
+	ENUM_REMOVE_RULE = 1,
 } NPMINI_COMMAND;
 
-//  Defines the command structure between the utility and the filter.
 typedef struct _COMMAND_MESSAGE {
-	NPMINI_COMMAND 	Command;
+	char* FileName;
+	NPMINI_COMMAND Mode;
 } COMMAND_MESSAGE, * PCOMMAND_MESSAGE;
+
+
+typedef struct _MiniFilterFileInfo
+{
+	char* FileName;
+} MiniFilterFileInfo, * PMiniFilterFileInfo;
+
+typedef struct _MiniFilterFileInfoList
+{
+	LIST_ENTRY		m_linkPointer;
+	MiniFilterFileInfo	m_MiniFilterFileInfo;
+
+}MiniFilterFileInfoLIST, * PMiniFilterFileInfoLIST;
+
+BOOLEAN InitMinFilterRuleInfo();
+BOOLEAN UninitMinFilterRuleInfo();
+BOOLEAN AddMiniFilterRuleInfo(PVOID pBuf, ULONG uLen);
+BOOLEAN IsHitMinifilterRuleFileName(PCHAR FilePath);

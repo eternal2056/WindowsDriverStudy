@@ -30,7 +30,8 @@ void readAndPrintFile(const std::string& filePath, std::vector<std::string>& for
 }
 
 /*
- * MultiFilterDriverExe.exe Minifilter
+ * MultiFilterDriverExe.exe Minifilter AddExe CHROME.EXE
+ * MultiFilterDriverExe.exe Minifilter RemoveRule
  *
  * MultiFilterDriverExe.exe WFP RemotePort 433
  * MultiFilterDriverExe.exe WFP RemotePort 80
@@ -59,7 +60,7 @@ int main(int argc, CHAR* argv[]) {
 	}
 	std::string driverType = argv[1];
 	if (driverType == "Minifilter") {
-		FileMiniFilterMain();
+		FileMiniFilterMain(argc, argv);
 	}
 	if (driverType == "WFP") {
 		WfpMain(argc, argv);

@@ -1,4 +1,5 @@
 ﻿#include "FileMiniFilterDriver.h"
+#include "Rule.h"
 //  Global variables
 
 PFLT_FILTER gFilterHandle;
@@ -7,8 +8,6 @@ ULONG gTraceFlags = 0;
 PFLT_FILTER gFilterHandle;
 PFLT_PORT 	gServerPort;
 PFLT_PORT 	gClientPort;
-
-NPMINI_COMMAND gCommand = ENUM_PASS;
 
 #define PT_DBG_PRINT( _dbgLevel, _string )          \
     (FlagOn(gTraceFlags,(_dbgLevel)) ?              \
@@ -34,6 +33,13 @@ NTSTATUS MiniFilterDriverEntry(
 	//  Register with FltMgr to tell it our callback routines
 	//
 
+	BOOLEAN bSucc = InitMinFilterRuleInfo();
+	if (bSucc == FALSE)
+	{
+		status = STATUS_UNSUCCESSFUL;
+		return status;
+	}
+
 	status = FltRegisterFilter(DriverObject,
 		&FilterRegistration,
 		&gFilterHandle);
@@ -51,6 +57,7 @@ NTSTATUS MiniFilterDriverEntry(
 		if (!NT_SUCCESS(status)) {
 
 			FltUnregisterFilter(gFilterHandle);
+			UninitMinFilterRuleInfo();
 		}
 	}
 	//Communication Port
@@ -101,6 +108,7 @@ NTSTATUS MiniFilterDriverEntry(
 		if (NULL != gFilterHandle) {
 			FltUnregisterFilter(gFilterHandle);
 		}
+		UninitMinFilterRuleInfo();
 	}
 	return status;
 }
@@ -220,7 +228,7 @@ NPUnload(
 
 	FltCloseCommunicationPort(gServerPort);
 	FltUnregisterFilter(gFilterHandle);
-
+	UninitMinFilterRuleInfo();
 	return STATUS_SUCCESS;
 }
 
@@ -253,17 +261,14 @@ NPPreCreate(
 			&nameInfo);
 		if (NT_SUCCESS(status)) {
 			//判斷是否阻擋
-			if (gCommand == ENUM_BLOCK) {
-				FltParseFileNameInformation(nameInfo);
-				if (NPUnicodeStringToChar(&nameInfo->Name, FileName)) {
-
-					if (strstr(FileName, "NOTEPAD.EXE") > 0) {
-
-						Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-						Data->IoStatus.Information = 0;
-						FltReleaseFileNameInformation(nameInfo);
-						return FLT_PREOP_COMPLETE;
-					}
+			FltParseFileNameInformation(nameInfo);
+			if (NPUnicodeStringToChar(&nameInfo->Name, FileName)) {
+				//KdPrintEx((77, 0, "%s %s %d IOCTL_WFP_SAMPLE_ADD_RULE %s\n", __FILE__, __FUNCTION__, __LINE__, FileName));
+				if (IsHitMinifilterRuleFileName(FileName)) {
+					Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+					Data->IoStatus.Information = 0;
+					FltReleaseFileNameInformation(nameInfo);
+					return FLT_PREOP_COMPLETE;
 				}
 			}
 			//release resource
@@ -391,34 +396,46 @@ NPMiniMessage(
 	//  these buffers.    
 
 	if ((InputBuffer != NULL) &&
-		(InputBufferSize >= (FIELD_OFFSET(COMMAND_MESSAGE, Command) +
+		(InputBufferSize >= (FIELD_OFFSET(COMMAND_MESSAGE, Mode) +
 			sizeof(NPMINI_COMMAND)))) {
 
 		try {
 			//  Probe and capture input message: the message is raw user mode
 			//  buffer, so need to protect with exception handler
-			command = ((PCOMMAND_MESSAGE)InputBuffer)->Command;
+			command = ((PCOMMAND_MESSAGE)InputBuffer)->Mode;
 
 		} except(EXCEPTION_EXECUTE_HANDLER) {
-
 			return GetExceptionCode();
 		}
 
 		switch (command) {
 			//開放規則
-		case ENUM_PASS:
+		case ENUM_ADD_RULE:
 		{
-			DbgPrint("[mini-filter] ENUM_PASS");
-			gCommand = ENUM_PASS;
-			status = STATUS_SUCCESS;
+			//DbgBreakPoint();
+			DbgPrint("[mini-filter] ENUM_ADD_RULE");
+			BOOLEAN bSucc = AddMiniFilterRuleInfo(InputBuffer, InputBufferSize);
+			if (bSucc == FALSE)
+			{
+				status = STATUS_UNSUCCESSFUL;
+			}
+			else {
+				status = STATUS_SUCCESS;
+			}
 			break;
 		}
 		//阻擋規則
-		case ENUM_BLOCK:
+		case ENUM_REMOVE_RULE:
 		{
-			DbgPrint("[mini-filter] ENUM_BLOCK");
-			gCommand = ENUM_BLOCK;
-			status = STATUS_SUCCESS;
+			DbgPrint("[mini-filter] ENUM_REMOVE_RULE");
+			BOOLEAN bSucc = UninitMinFilterRuleInfo();
+			if (bSucc == FALSE)
+			{
+				status = STATUS_UNSUCCESSFUL;
+			}
+			else {
+				status = STATUS_SUCCESS;
+			}
 			break;
 		}
 
@@ -434,4 +451,118 @@ NPMiniMessage(
 	}
 
 	return status;
+}
+
+LIST_ENTRY	g_MiniFilterRuleList = { 0 };
+
+KSPIN_LOCK  g_MiniFilterRuleLock = 0;
+
+BOOLEAN InitMinFilterRuleInfo()
+{
+	InitializeListHead(&g_MiniFilterRuleList);
+	KeInitializeSpinLock(&g_MiniFilterRuleLock);
+	return TRUE;
+}
+
+BOOLEAN UninitMinFilterRuleInfo()
+{
+	do
+	{
+		KIRQL	OldIRQL = 0;
+		PLIST_ENTRY pInfo = NULL;
+		PMiniFilterFileInfoLIST pRule = NULL;
+		if (g_MiniFilterRuleList.Blink == NULL ||
+			g_MiniFilterRuleList.Flink == NULL)
+		{
+			break;
+		}
+		KeAcquireSpinLock(&g_MiniFilterRuleLock, &OldIRQL);
+		while (!IsListEmpty(&g_MiniFilterRuleList))
+		{
+			pInfo = RemoveHeadList(&g_MiniFilterRuleList);
+			if (pInfo == NULL)
+			{
+				break;
+			}
+			pRule = CONTAINING_RECORD(pInfo, MiniFilterFileInfoLIST, m_linkPointer);
+			ExFreePoolWithTag(pRule, L"UninitMinFilterRuleInfo");
+			pRule = NULL;
+			pInfo = NULL;
+		}
+		KeReleaseSpinLock(&g_MiniFilterRuleLock, OldIRQL);
+	} while (FALSE);
+	return TRUE;
+}
+
+BOOLEAN AddMiniFilterRuleInfo(PVOID pBuf, ULONG uLen)
+{
+	BOOLEAN bSucc = FALSE;
+	PMiniFilterFileInfo	pRuleInfo = NULL;
+	do
+	{
+		PMiniFilterFileInfoLIST pRuleNode = NULL;
+		KIRQL	OldIRQL = 0;
+		pRuleInfo = (PMiniFilterFileInfo)pBuf;
+		if (pRuleInfo == NULL)
+		{
+			break;
+		}
+		if (uLen < sizeof(MiniFilterFileInfo))
+		{
+			break;
+		}
+		pRuleNode = (PMiniFilterFileInfoLIST)ExAllocatePoolWithTag(NonPagedPool, sizeof(MiniFilterFileInfoLIST), "AddMiniFilterRuleInfo");
+		if (pRuleNode == NULL)
+		{
+			break;
+		}
+		memset(pRuleNode, 0, sizeof(MiniFilterFileInfoLIST));
+		if (pRuleInfo->FileName) {
+			pRuleNode->m_MiniFilterFileInfo.FileName = (PCHAR)ExAllocatePoolWithTag(NonPagedPool, strlen(pRuleInfo->FileName) + 1, 'MySt');
+			if (pRuleNode->m_MiniFilterFileInfo.FileName) InitializeAnsiString(pRuleNode->m_MiniFilterFileInfo.FileName, pRuleInfo->FileName);
+		}
+
+		KeAcquireSpinLock(&g_MiniFilterRuleLock, &OldIRQL);
+		InsertHeadList(&g_MiniFilterRuleList, &pRuleNode->m_linkPointer);
+		KeReleaseSpinLock(&g_MiniFilterRuleLock, OldIRQL);
+		bSucc = TRUE;
+		break;
+	} while (FALSE);
+	return bSucc;
+}
+
+BOOLEAN IsHitMinifilterRuleFileName(PCHAR FilePath) {
+	BOOLEAN bIsHit = FALSE;
+	do
+	{
+
+		KIRQL	OldIRQL = 0;
+		PLIST_ENTRY	pEntry = NULL;
+		if (g_MiniFilterRuleList.Blink == NULL ||
+			g_MiniFilterRuleList.Flink == NULL)
+		{
+			DbgPrint("q");
+			break;
+		}
+
+		KeAcquireSpinLock(&g_MiniFilterRuleLock, &OldIRQL);
+		pEntry = g_MiniFilterRuleList.Flink;
+		while (pEntry != &g_MiniFilterRuleList)
+		{
+			PMiniFilterFileInfoLIST pInfo = CONTAINING_RECORD(pEntry, MiniFilterFileInfoLIST, m_linkPointer);
+
+			if (FilePath != NULL) {
+				if (pInfo->m_MiniFilterFileInfo.FileName != NULL) {
+					if (strstr(FilePath, pInfo->m_MiniFilterFileInfo.FileName) != NULL) {
+						bIsHit = TRUE;
+						break;
+					}
+				}
+			}
+
+			pEntry = pEntry->Flink;
+		}
+		KeReleaseSpinLock(&g_MiniFilterRuleLock, OldIRQL);
+	} while (FALSE);
+	return bIsHit;
 }
