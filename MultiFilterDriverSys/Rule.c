@@ -82,10 +82,10 @@ BOOLEAN AddNetRuleInfo(PVOID pBuf, ULONG uLen)
 		pRuleNode->m_stWfpNetInfo.m_ulNetWorkType = pRuleInfo->m_ulNetWorkType;
 		pRuleNode->m_stWfpNetInfo.m_uDirection = pRuleInfo->m_uDirection;
 
-		pRuleNode->m_stWfpNetInfo.m_url = (PCHAR)ExAllocatePoolWithTag(
-			NonPagedPool, strlen(pRuleInfo->m_url) + 1, 'MySt');
-
-		if (pRuleNode->m_stWfpNetInfo.m_url) InitializeAnsiString(pRuleNode->m_stWfpNetInfo.m_url, pRuleInfo->m_url);
+		if (pRuleInfo->m_url) {
+			pRuleNode->m_stWfpNetInfo.m_url = (PCHAR)ExAllocatePoolWithTag(NonPagedPool, strlen(pRuleInfo->m_url) + 1, 'MySt');
+			if (pRuleNode->m_stWfpNetInfo.m_url) InitializeAnsiString(pRuleNode->m_stWfpNetInfo.m_url, pRuleInfo->m_url);
+		}
 
 		KeAcquireSpinLock(&g_RuleLock, &OldIRQL);
 		InsertHeadList(&g_WfpRuleList, &pRuleNode->m_linkPointer);

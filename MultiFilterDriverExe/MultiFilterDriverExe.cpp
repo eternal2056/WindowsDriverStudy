@@ -32,10 +32,12 @@ void readAndPrintFile(const std::string& filePath, std::vector<std::string>& for
 /*
  * MultiFilterDriverExe.exe Minifilter
  *
- * MultiFilterDriverExe.exe WFP Port 433
- * MultiFilterDriverExe.exe WFP Port 80
+ * MultiFilterDriverExe.exe WFP RemotePort 433
+ * MultiFilterDriverExe.exe WFP RemotePort 80
  * MultiFilterDriverExe.exe WFP RemoveRule
  * MultiFilterDriverExe.exe WFP AddressListAdd
+ * MultiFilterDriverExe.exe WFP AddressAdd bilibili.com
+ * MultiFilterDriverExe.exe WFP RemoteIp 192.168.1.4
  *
  * MultiFilterDriverExe.exe Control CoverProcess [ProcessId]
  *
