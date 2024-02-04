@@ -31,6 +31,7 @@ void readAndPrintFile(const std::string& filePath, std::vector<std::string>& for
 
 /*
  * MultiFilterDriverExe.exe Minifilter AddExe CHROME.EXE
+ * MultiFilterDriverExe.exe Minifilter AddExeList
  * MultiFilterDriverExe.exe Minifilter RemoveRule
  *
  * MultiFilterDriverExe.exe WFP RemotePort 433
