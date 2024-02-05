@@ -1,9 +1,13 @@
 ﻿#include "FileMiniFilterDriver.h"
 #include "Rule.h"
+#include "Helper.h"
+#include "ExcludeList.h"
 //  Global variables
-
+#define FSFILTER_ALLOC_TAG 'DHlF'
 PFLT_FILTER gFilterHandle;
 ULONG gTraceFlags = 0;
+BOOLEAN g_deviceInitedMiniFilter = FALSE;
+PDEVICE_OBJECT g_deviceObjectMiniFilter = NULL;
 
 PFLT_FILTER gFilterHandle;
 PFLT_PORT 	gServerPort;
@@ -13,6 +17,287 @@ PFLT_PORT 	gClientPort;
     (FlagOn(gTraceFlags,(_dbgLevel)) ?              \
         DbgPrint _string :                          \
         ((void)0))
+
+
+NTSTATUS AddHiddenObject(PHid_HideObjectPacket Packet, USHORT Size, PULONGLONG ObjId)
+{
+	NTSTATUS status = STATUS_SUCCESS;
+	UNICODE_STRING path;
+	USHORT i, count;
+
+	// Check can we access to the packet
+	if (Size < sizeof(Hid_HideObjectPacket))
+		return STATUS_INVALID_PARAMETER;
+
+	// Check packet data size overflow
+	if (Size < Packet->dataSize + sizeof(Hid_HideObjectPacket))
+		return STATUS_INVALID_PARAMETER;
+
+	// Unpack string to UNICODE_STRING
+
+	path.Buffer = (LPWSTR)((PCHAR)Packet + sizeof(Hid_HideObjectPacket));
+	path.MaximumLength = Size - sizeof(Hid_HideObjectPacket);
+
+	// Just checking for zero-end string ends in the middle
+	count = Packet->dataSize / sizeof(WCHAR);
+	for (i = 0; i < count; i++)
+		if (path.Buffer[i] == L'\0')
+			break;
+
+	path.Length = i * sizeof(WCHAR);
+
+	// Perform the packet
+
+	switch (Packet->objType)
+	{
+	case FsFileObject:
+		status = AddHiddenFile(&path, ObjId);
+		break;
+	case FsDirObject:
+		status = AddHiddenDir(&path, ObjId);
+		break;
+	default:
+		LogWarning("Unsupported object type: %u", Packet->objType);
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	return status;
+}
+
+NTSTATUS RemoveHiddenObject(PHid_UnhideObjectPacket Packet, USHORT Size)
+{
+	NTSTATUS status = STATUS_SUCCESS;
+
+	if (Size != sizeof(Hid_UnhideObjectPacket))
+		return STATUS_INVALID_PARAMETER;
+
+	// Perform packet
+
+	switch (Packet->objType)
+	{
+	case FsFileObject:
+		status = RemoveHiddenFile(Packet->id);
+		break;
+	case FsDirObject:
+		status = RemoveHiddenDir(Packet->id);
+		break;
+	default:
+		LogWarning("Unsupported object type: %u", Packet->objType);
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	return status;
+}
+
+NTSTATUS RemoveAllHiddenObjects(PHid_UnhideAllObjectsPacket Packet, USHORT Size)
+{
+	NTSTATUS status = STATUS_SUCCESS;
+
+	if (Size != sizeof(Hid_UnhideAllObjectsPacket))
+		return STATUS_INVALID_PARAMETER;
+
+	// Perform packet
+
+	switch (Packet->objType)
+	{
+	case FsFileObject:
+		status = RemoveAllHiddenFiles();
+		break;
+	case FsDirObject:
+		status = RemoveAllHiddenDirs();
+		break;
+	default:
+		LogWarning("Unsupported object type: %u", Packet->objType);
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	return status;
+}
+
+_Function_class_(DRIVER_DISPATCH)
+_Dispatch_type_(IRP_MJ_CREATE)
+NTSTATUS IrpMiniFilterDeviceCreate(PDEVICE_OBJECT  DeviceObject, PIRP  Irp)
+{
+	UNREFERENCED_PARAMETER(DeviceObject);
+
+	Irp->IoStatus.Status = STATUS_SUCCESS;
+	Irp->IoStatus.Information = 0;
+	IoCompleteRequest(Irp, IO_NO_INCREMENT);
+
+	return STATUS_SUCCESS;
+}
+
+_Function_class_(DRIVER_DISPATCH)
+_Dispatch_type_(IRP_MJ_CLOSE)
+NTSTATUS IrpMiniFilterDeviceClose(PDEVICE_OBJECT  DeviceObject, PIRP  Irp)
+{
+	UNREFERENCED_PARAMETER(DeviceObject);
+
+	Irp->IoStatus.Status = STATUS_SUCCESS;
+	Irp->IoStatus.Information = 0;
+	IoCompleteRequest(Irp, IO_NO_INCREMENT);
+
+	return STATUS_SUCCESS;
+}
+
+_Function_class_(DRIVER_DISPATCH)
+_Dispatch_type_(IRP_MJ_CLEANUP)
+NTSTATUS IrpMiniFilterDeviceCleanup(PDEVICE_OBJECT  DeviceObject, PIRP  Irp)
+{
+	UNREFERENCED_PARAMETER(DeviceObject);
+
+	Irp->IoStatus.Status = STATUS_SUCCESS;
+	Irp->IoStatus.Information = 0;
+	IoCompleteRequest(Irp, IO_NO_INCREMENT);
+
+	return STATUS_SUCCESS;
+}
+
+_Function_class_(DRIVER_DISPATCH)
+_Dispatch_type_(IRP_MJ_DEVICE_CONTROL)
+NTSTATUS IrpMiniFilterDeviceControlHandler(PDEVICE_OBJECT  DeviceObject, PIRP  Irp)
+{
+	PIO_STACK_LOCATION irpStack;
+	Hid_StatusPacket result;
+	NTSTATUS status = STATUS_SUCCESS;
+	PVOID inputBuffer, outputBuffer, outputData;
+	ULONG ioctl, inputBufferSize, outputBufferSize, outputBufferMaxSize,
+		outputDataMaxSize, outputDataSize;
+
+	UNREFERENCED_PARAMETER(DeviceObject);
+
+	// Get irp information
+
+	irpStack = IoGetCurrentIrpStackLocation(Irp);
+	ioctl = irpStack->Parameters.DeviceIoControl.IoControlCode;
+
+	inputBuffer = outputBuffer = Irp->AssociatedIrp.SystemBuffer;
+	inputBufferSize = irpStack->Parameters.DeviceIoControl.InputBufferLength;
+	outputBufferMaxSize = irpStack->Parameters.DeviceIoControl.OutputBufferLength;
+	outputBufferSize = 0;
+	outputDataSize = 0;
+	outputDataMaxSize = 0;
+
+	RtlZeroMemory(&result, sizeof(result));
+
+	// Check output buffer size
+
+	if (outputBufferMaxSize < sizeof(result))
+	{
+		status = STATUS_INVALID_PARAMETER;
+		goto EndProc;
+	}
+
+	// Prepare additional buffer for output data 
+	outputData = (PVOID)((UINT_PTR)outputBuffer + sizeof(result));
+	outputDataMaxSize = outputBufferMaxSize - sizeof(result);
+
+	// Important limitation:
+	// Because both input (inputBuffer) and output data (outputData) are located in the same buffer there is a limitation for the output
+	// buffer usage. When a ioctl handler is executing, it can use the input buffer only until first write to the output buffer, because
+	// when you put data to the output buffer you can overwrite data in input buffer. Therefore if you gonna use both an input and output 
+	// data in the same time you should make the copy of input data and work with it.
+	switch (ioctl)
+	{
+		// Reg/Fs 
+	case HID_IOCTL_ADD_HIDDEN_OBJECT:
+		result.status = AddHiddenObject((PHid_HideObjectPacket)inputBuffer, (USHORT)inputBufferSize, &result.info.id);
+		break;
+	case HID_IOCTL_REMOVE_HIDDEN_OBJECT:
+		result.status = RemoveHiddenObject((PHid_UnhideObjectPacket)inputBuffer, (USHORT)inputBufferSize);
+		break;
+	case HID_IOCTL_REMOVE_ALL_HIDDEN_OBJECTS:
+		result.status = RemoveAllHiddenObjects((PHid_UnhideAllObjectsPacket)inputBuffer, (USHORT)inputBufferSize);
+		break;
+		// Other
+	default:
+		LogWarning("Unknown IOCTL code:%08x", ioctl);
+		status = STATUS_INVALID_PARAMETER;
+		goto EndProc;
+	}
+
+EndProc:
+
+	// If additional output data has been presented
+	if (NT_SUCCESS(status) && outputDataSize > 0)
+	{
+		if (outputDataSize > outputDataMaxSize)
+		{
+			LogWarning("An internal error, looks like a stack corruption!");
+			outputDataSize = outputDataMaxSize;
+			result.status = (ULONG)STATUS_PARTIAL_COPY;
+		}
+
+		result.dataSize = outputDataSize;
+	}
+
+	// Copy result to output buffer
+	if (NT_SUCCESS(status))
+	{
+		outputBufferSize = sizeof(result) + outputDataSize;
+		RtlCopyMemory(outputBuffer, &result, sizeof(result));
+	}
+
+	Irp->IoStatus.Status = status;
+	Irp->IoStatus.Information = outputBufferSize;
+	IoCompleteRequest(Irp, IO_NO_INCREMENT);
+
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS InitializeMiniFilterDevice(PDRIVER_OBJECT DriverObject)
+{
+	NTSTATUS status = STATUS_SUCCESS;
+	UNICODE_STRING deviceName = RTL_CONSTANT_STRING(MINIFILTER_DEVICE_NAME);
+	UNICODE_STRING dosDeviceName = RTL_CONSTANT_STRING(MINIFILTER_DOS_DEVICES_LINK_NAME);
+	PDEVICE_OBJECT deviceObject = NULL;
+
+	status = IoCreateDevice(DriverObject, 0, &deviceName, FILE_DEVICE_UNKNOWN, 0, FALSE, &deviceObject);
+	if (!NT_SUCCESS(status))
+	{
+		LogError("Error, device creation failed with code:%08x", status);
+		return status;
+	}
+
+	status = IoCreateSymbolicLink(&dosDeviceName, &deviceName);
+	if (!NT_SUCCESS(status))
+	{
+		IoDeleteDevice(deviceObject);
+		LogError("Error, symbolic link creation failed with code:%08x", status);
+		return status;
+	}
+
+	DriverObject->MajorFunction[IRP_MJ_CREATE] = IrpMiniFilterDeviceCreate;
+	DriverObject->MajorFunction[IRP_MJ_CLOSE] = IrpMiniFilterDeviceClose;
+	DriverObject->MajorFunction[IRP_MJ_CLEANUP] = IrpMiniFilterDeviceCleanup;
+	DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = IrpMiniFilterDeviceControlHandler;
+	g_deviceObjectMiniFilter = deviceObject;
+	g_deviceInitedMiniFilter = TRUE;
+
+	LogTrace("Initialization is completed");
+	return status;
+}
+
+NTSTATUS DestroyMiniFilterDevice()
+{
+	NTSTATUS status = STATUS_SUCCESS;
+	UNICODE_STRING dosDeviceName = RTL_CONSTANT_STRING(MINIFILTER_DOS_DEVICES_LINK_NAME);
+
+	if (!g_deviceInitedMiniFilter)
+		return STATUS_NOT_FOUND;
+
+	status = IoDeleteSymbolicLink(&dosDeviceName);
+	if (!NT_SUCCESS(status))
+		LogWarning("Error, symbolic link deletion failed with code:%08x", status);
+
+	IoDeleteDevice(g_deviceObjectMiniFilter);
+
+	g_deviceInitedMiniFilter = FALSE;
+
+	LogTrace("Deinitialization is completed");
+	return status;
+}
+
 
 NTSTATUS MiniFilterDriverEntry(
 	__in PDRIVER_OBJECT DriverObject,
@@ -32,6 +317,10 @@ NTSTATUS MiniFilterDriverEntry(
 	//
 	//  Register with FltMgr to tell it our callback routines
 	//
+
+	status = InitializeMiniFilterDevice(DriverObject);
+	if (!NT_SUCCESS(status))
+		LogWarning("Error, can't create device");
 
 	BOOLEAN bSucc = InitMinFilterRuleInfo();
 	if (bSucc == FALSE)
@@ -82,6 +371,8 @@ NTSTATUS MiniFilterDriverEntry(
 		NULL,
 		sd);
 
+	status = InitializeFSMiniFilter(DriverObject);
+
 	status = FltCreateCommunicationPort(gFilterHandle,
 		&gServerPort,
 		&oa,
@@ -109,6 +400,7 @@ NTSTATUS MiniFilterDriverEntry(
 			FltUnregisterFilter(gFilterHandle);
 		}
 		UninitMinFilterRuleInfo();
+		DestroyFSMiniFilter();
 	}
 	return status;
 }
@@ -226,9 +518,11 @@ NPUnload(
 	PT_DBG_PRINT(PTDBG_TRACE_ROUTINES,
 		("NPminifilter!NPUnload: Entered\n"));
 
+	DestroyMiniFilterDevice();
 	FltCloseCommunicationPort(gServerPort);
 	FltUnregisterFilter(gFilterHandle);
 	UninitMinFilterRuleInfo();
+	DestroyFSMiniFilter();
 	return STATUS_SUCCESS;
 }
 
@@ -565,4 +859,765 @@ BOOLEAN IsHitMinifilterRuleFileName(PCHAR FilePath) {
 		KeReleaseSpinLock(&g_MiniFilterRuleLock, OldIRQL);
 	} while (FALSE);
 	return bIsHit;
+}
+
+FLT_PREOP_CALLBACK_STATUS FltDirCtrlPreOperation(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID* CompletionContext)
+{
+	UNREFERENCED_PARAMETER(FltObjects);
+	UNREFERENCED_PARAMETER(CompletionContext);
+
+	//if (!IsDriverEnabled())
+	//	return FLT_PREOP_SUCCESS_NO_CALLBACK;
+
+	LogInfo("%wZ", &Data->Iopb->TargetFileObject->FileName);
+
+	if (Data->Iopb->MinorFunction != IRP_MN_QUERY_DIRECTORY)
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+
+	switch (Data->Iopb->Parameters.DirectoryControl.QueryDirectory.FileInformationClass)
+	{
+	case FileIdFullDirectoryInformation:
+	case FileIdBothDirectoryInformation:
+	case FileBothDirectoryInformation:
+	case FileDirectoryInformation:
+	case FileFullDirectoryInformation:
+	case FileNamesInformation:
+		break;
+	default:
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+
+	return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+}
+
+FLT_POSTOP_CALLBACK_STATUS FltDirCtrlPostOperation(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID CompletionContext, FLT_POST_OPERATION_FLAGS Flags)
+{
+	PFLT_PARAMETERS params = &Data->Iopb->Parameters;
+	PFLT_FILE_NAME_INFORMATION fltName;
+	NTSTATUS status;
+
+	UNREFERENCED_PARAMETER(FltObjects);
+	UNREFERENCED_PARAMETER(CompletionContext);
+	UNREFERENCED_PARAMETER(Flags);
+
+	//if (!IsDriverEnabled())
+		//return FLT_POSTOP_FINISHED_PROCESSING;
+
+	if (!NT_SUCCESS(Data->IoStatus.Status))
+		return FLT_POSTOP_FINISHED_PROCESSING;
+
+	LogInfo("%wZ", &Data->Iopb->TargetFileObject->FileName);
+
+	//if (IsProcessExcluded(PsGetCurrentProcessId()))
+	//{
+	//	LogTrace("Operation is skipped for excluded process");
+	//	return FLT_POSTOP_FINISHED_PROCESSING;
+	//}
+
+	status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED, &fltName);
+	if (!NT_SUCCESS(status))
+	{
+		LogWarning("FltGetFileNameInformation() failed with code:%08x", status);
+		return FLT_POSTOP_FINISHED_PROCESSING;
+	}
+
+	__try
+	{
+		status = STATUS_SUCCESS;
+
+		// 这六个是结构体不一样, 其他都一样, 目的是把每个不同的 information 都删掉
+		// 这个好像是暂时的, 就算删掉, 再一次获取的时候还是会恢复正常? 这说明还有更底层的地方, 或许删掉那个就无法恢复了.
+		switch (params->DirectoryControl.QueryDirectory.FileInformationClass)
+		{
+		case FileFullDirectoryInformation:
+			status = CleanFileFullDirectoryInformation((PFILE_FULL_DIR_INFORMATION)params->DirectoryControl.QueryDirectory.DirectoryBuffer, fltName);
+			break;
+		case FileBothDirectoryInformation:
+			status = CleanFileBothDirectoryInformation((PFILE_BOTH_DIR_INFORMATION)params->DirectoryControl.QueryDirectory.DirectoryBuffer, fltName);
+			break;
+		case FileDirectoryInformation:
+			status = CleanFileDirectoryInformation((PFILE_DIRECTORY_INFORMATION)params->DirectoryControl.QueryDirectory.DirectoryBuffer, fltName);
+			break;
+		case FileIdFullDirectoryInformation:
+			status = CleanFileIdFullDirectoryInformation((PFILE_ID_FULL_DIR_INFORMATION)params->DirectoryControl.QueryDirectory.DirectoryBuffer, fltName);
+			break;
+		case FileIdBothDirectoryInformation:
+			status = CleanFileIdBothDirectoryInformation((PFILE_ID_BOTH_DIR_INFORMATION)params->DirectoryControl.QueryDirectory.DirectoryBuffer, fltName);
+			break;
+		case FileNamesInformation:
+			status = CleanFileNamesInformation((PFILE_NAMES_INFORMATION)params->DirectoryControl.QueryDirectory.DirectoryBuffer, fltName);
+			break;
+		}
+
+		Data->IoStatus.Status = status;
+	}
+	__finally
+	{
+		FltReleaseFileNameInformation(fltName);
+	}
+
+	return FLT_POSTOP_FINISHED_PROCESSING;
+}
+
+// 总体原理就是 A -> B -> C ---> A -> C 或者 A B C D -> B C D
+NTSTATUS CleanFileFullDirectoryInformation(PFILE_FULL_DIR_INFORMATION info, PFLT_FILE_NAME_INFORMATION fltName)
+{
+	PFILE_FULL_DIR_INFORMATION nextInfo, prevInfo = NULL;
+	UNICODE_STRING fileName;
+	UINT32 offset, moveLength;
+	BOOLEAN matched, search;
+	NTSTATUS status = STATUS_SUCCESS;
+
+	offset = 0;
+	search = TRUE;
+
+	do
+	{
+		// 从 info 获取 name
+		fileName.Buffer = info->FileName;
+		fileName.Length = (USHORT)info->FileNameLength;
+		fileName.MaximumLength = (USHORT)info->FileNameLength;
+
+		if (info->FileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			matched = CheckExcludeListDirFile(g_excludeDirectoryContext, &fltName->Name, &fileName);
+		else
+			matched = CheckExcludeListDirFile(g_excludeFileContext, &fltName->Name, &fileName);
+
+		if (matched)
+		{
+			BOOLEAN retn = FALSE;
+
+			if (prevInfo != NULL)
+			{
+				if (info->NextEntryOffset != 0)
+				{
+					prevInfo->NextEntryOffset += info->NextEntryOffset;
+					offset = info->NextEntryOffset;
+				}
+				else
+				{
+					prevInfo->NextEntryOffset = 0;
+					status = STATUS_SUCCESS;
+					retn = TRUE;
+				}
+
+				RtlFillMemory(info, sizeof(FILE_FULL_DIR_INFORMATION), 0);
+			}
+			// 如果第一个就是匹配的
+			else
+			{
+				// 如果还有别的文件
+				if (info->NextEntryOffset != 0)
+				{
+					nextInfo = (PFILE_FULL_DIR_INFORMATION)((PUCHAR)info + info->NextEntryOffset);
+					moveLength = 0;
+					// 直到 nextInfo 是最后一个结点
+					while (nextInfo->NextEntryOffset != 0)
+					{
+						moveLength += nextInfo->NextEntryOffset;
+						nextInfo = (PFILE_FULL_DIR_INFORMATION)((PUCHAR)nextInfo + nextInfo->NextEntryOffset);
+					}
+					// 移动块大小 = 从第二个结点开始到最后一个结点距离 + 最后结点的长度
+					moveLength += FIELD_OFFSET(FILE_FULL_DIR_INFORMATION, FileName) + nextInfo->FileNameLength;
+					// 下一个文件信息放到 -> 需要隐藏的文件信息上面 -> A B C D E -> B C D E
+					RtlMoveMemory(info, (PUCHAR)info + info->NextEntryOffset, moveLength);//continue
+				}
+				// 没有的话直接 return 没有啥东西
+				else
+				{
+					status = STATUS_NO_MORE_ENTRIES;
+					retn = TRUE;
+				}
+			}
+			LogTrace("Removed from query: %wZ\\%wZ", &fltName->Name, &fileName);
+
+			if (retn)
+				return status;
+
+			info = (PFILE_FULL_DIR_INFORMATION)((PCHAR)info + offset);
+			continue;
+		}
+
+		// 如果不匹配就下一个
+		offset = info->NextEntryOffset;
+		prevInfo = info;
+		info = (PFILE_FULL_DIR_INFORMATION)((PCHAR)info + offset);
+
+		// 没有下一个就停
+		if (offset == 0)
+			search = FALSE;
+	} while (search);
+
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS CleanFileBothDirectoryInformation(PFILE_BOTH_DIR_INFORMATION info, PFLT_FILE_NAME_INFORMATION fltName)
+{
+	PFILE_BOTH_DIR_INFORMATION nextInfo, prevInfo = NULL;
+	UNICODE_STRING fileName;
+	UINT32 offset, moveLength;
+	BOOLEAN matched, search;
+	NTSTATUS status = STATUS_SUCCESS;
+
+	offset = 0;
+	search = TRUE;
+
+	do
+	{
+		fileName.Buffer = info->FileName;
+		fileName.Length = (USHORT)info->FileNameLength;
+		fileName.MaximumLength = (USHORT)info->FileNameLength;
+
+		if (info->FileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			matched = CheckExcludeListDirFile(g_excludeDirectoryContext, &fltName->Name, &fileName);
+		else
+			matched = CheckExcludeListDirFile(g_excludeFileContext, &fltName->Name, &fileName);
+
+		if (matched)
+		{
+			BOOLEAN retn = FALSE;
+
+			if (prevInfo != NULL)
+			{
+				if (info->NextEntryOffset != 0)
+				{
+					prevInfo->NextEntryOffset += info->NextEntryOffset;
+					offset = info->NextEntryOffset;
+				}
+				else
+				{
+					prevInfo->NextEntryOffset = 0;
+					status = STATUS_SUCCESS;
+					retn = TRUE;
+				}
+
+				RtlFillMemory(info, sizeof(FILE_BOTH_DIR_INFORMATION), 0);
+			}
+			else
+			{
+				if (info->NextEntryOffset != 0)
+				{
+					nextInfo = (PFILE_BOTH_DIR_INFORMATION)((PUCHAR)info + info->NextEntryOffset);
+					moveLength = 0;
+					while (nextInfo->NextEntryOffset != 0)
+					{
+						moveLength += nextInfo->NextEntryOffset;
+						nextInfo = (PFILE_BOTH_DIR_INFORMATION)((PUCHAR)nextInfo + nextInfo->NextEntryOffset);
+					}
+
+					moveLength += FIELD_OFFSET(FILE_BOTH_DIR_INFORMATION, FileName) + nextInfo->FileNameLength;
+					RtlMoveMemory(info, (PUCHAR)info + info->NextEntryOffset, moveLength);//continue
+				}
+				else
+				{
+					status = STATUS_NO_MORE_ENTRIES;
+					retn = TRUE;
+				}
+			}
+
+			LogTrace("Removed from query: %wZ\\%wZ", &fltName->Name, &fileName);
+
+			if (retn)
+				return status;
+
+			info = (PFILE_BOTH_DIR_INFORMATION)((PCHAR)info + offset);
+			continue;
+		}
+
+		offset = info->NextEntryOffset;
+		prevInfo = info;
+		info = (PFILE_BOTH_DIR_INFORMATION)((PCHAR)info + offset);
+
+		if (offset == 0)
+			search = FALSE;
+	} while (search);
+
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS CleanFileDirectoryInformation(PFILE_DIRECTORY_INFORMATION info, PFLT_FILE_NAME_INFORMATION fltName)
+{
+	PFILE_DIRECTORY_INFORMATION nextInfo, prevInfo = NULL;
+	UNICODE_STRING fileName;
+	UINT32 offset, moveLength;
+	BOOLEAN matched, search;
+	NTSTATUS status = STATUS_SUCCESS;
+
+	offset = 0;
+	search = TRUE;
+
+	do
+	{
+		fileName.Buffer = info->FileName;
+		fileName.Length = (USHORT)info->FileNameLength;
+		fileName.MaximumLength = (USHORT)info->FileNameLength;
+
+		if (info->FileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			matched = CheckExcludeListDirFile(g_excludeDirectoryContext, &fltName->Name, &fileName);
+		else
+			matched = CheckExcludeListDirFile(g_excludeFileContext, &fltName->Name, &fileName);
+
+		if (matched)
+		{
+			BOOLEAN retn = FALSE;
+
+			if (prevInfo != NULL)
+			{
+				if (info->NextEntryOffset != 0)
+				{
+					prevInfo->NextEntryOffset += info->NextEntryOffset;
+					offset = info->NextEntryOffset;
+				}
+				else
+				{
+					prevInfo->NextEntryOffset = 0;
+					status = STATUS_SUCCESS;
+					retn = TRUE;
+				}
+
+				RtlFillMemory(info, sizeof(FILE_DIRECTORY_INFORMATION), 0);
+			}
+			else
+			{
+				if (info->NextEntryOffset != 0)
+				{
+					nextInfo = (PFILE_DIRECTORY_INFORMATION)((PUCHAR)info + info->NextEntryOffset);
+					moveLength = 0;
+					while (nextInfo->NextEntryOffset != 0)
+					{
+						moveLength += nextInfo->NextEntryOffset;
+						nextInfo = (PFILE_DIRECTORY_INFORMATION)((PUCHAR)nextInfo + nextInfo->NextEntryOffset);
+					}
+
+					moveLength += FIELD_OFFSET(FILE_DIRECTORY_INFORMATION, FileName) + nextInfo->FileNameLength;
+					RtlMoveMemory(info, (PUCHAR)info + info->NextEntryOffset, moveLength);//continue
+				}
+				else
+				{
+					status = STATUS_NO_MORE_ENTRIES;
+					retn = TRUE;
+				}
+			}
+
+			LogTrace("Removed from query: %wZ\\%wZ", &fltName->Name, &fileName);
+
+			if (retn)
+				return status;
+
+			info = (PFILE_DIRECTORY_INFORMATION)((PCHAR)info + offset);
+			continue;
+		}
+
+		offset = info->NextEntryOffset;
+		prevInfo = info;
+		info = (PFILE_DIRECTORY_INFORMATION)((PCHAR)info + offset);
+
+		if (offset == 0)
+			search = FALSE;
+	} while (search);
+
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS CleanFileIdFullDirectoryInformation(PFILE_ID_FULL_DIR_INFORMATION info, PFLT_FILE_NAME_INFORMATION fltName)
+{
+	PFILE_ID_FULL_DIR_INFORMATION nextInfo, prevInfo = NULL;
+	UNICODE_STRING fileName;
+	UINT32 offset, moveLength;
+	BOOLEAN matched, search;
+	NTSTATUS status = STATUS_SUCCESS;
+
+	offset = 0;
+	search = TRUE;
+
+	do
+	{
+		fileName.Buffer = info->FileName;
+		fileName.Length = (USHORT)info->FileNameLength;
+		fileName.MaximumLength = (USHORT)info->FileNameLength;
+
+		if (info->FileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			matched = CheckExcludeListDirFile(g_excludeDirectoryContext, &fltName->Name, &fileName);
+		else
+			matched = CheckExcludeListDirFile(g_excludeFileContext, &fltName->Name, &fileName);
+
+		if (matched)
+		{
+			BOOLEAN retn = FALSE;
+
+			if (prevInfo != NULL)
+			{
+				if (info->NextEntryOffset != 0)
+				{
+					prevInfo->NextEntryOffset += info->NextEntryOffset;
+					offset = info->NextEntryOffset;
+				}
+				else
+				{
+					prevInfo->NextEntryOffset = 0;
+					status = STATUS_SUCCESS;
+					retn = TRUE;
+				}
+
+				RtlFillMemory(info, sizeof(FILE_ID_FULL_DIR_INFORMATION), 0);
+			}
+			else
+			{
+				if (info->NextEntryOffset != 0)
+				{
+					nextInfo = (PFILE_ID_FULL_DIR_INFORMATION)((PUCHAR)info + info->NextEntryOffset);
+					moveLength = 0;
+					while (nextInfo->NextEntryOffset != 0)
+					{
+						moveLength += nextInfo->NextEntryOffset;
+						nextInfo = (PFILE_ID_FULL_DIR_INFORMATION)((PUCHAR)nextInfo + nextInfo->NextEntryOffset);
+					}
+
+					moveLength += FIELD_OFFSET(FILE_ID_FULL_DIR_INFORMATION, FileName) + nextInfo->FileNameLength;
+					RtlMoveMemory(info, (PUCHAR)info + info->NextEntryOffset, moveLength);//continue
+				}
+				else
+				{
+					status = STATUS_NO_MORE_ENTRIES;
+					retn = TRUE;
+				}
+			}
+
+			LogTrace("Removed from query: %wZ\\%wZ", &fltName->Name, &fileName);
+
+			if (retn)
+				return status;
+
+			info = (PFILE_ID_FULL_DIR_INFORMATION)((PCHAR)info + offset);
+			continue;
+		}
+
+		offset = info->NextEntryOffset;
+		prevInfo = info;
+		info = (PFILE_ID_FULL_DIR_INFORMATION)((PCHAR)info + offset);
+
+		if (offset == 0)
+			search = FALSE;
+	} while (search);
+
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS CleanFileIdBothDirectoryInformation(PFILE_ID_BOTH_DIR_INFORMATION info, PFLT_FILE_NAME_INFORMATION fltName)
+{
+	PFILE_ID_BOTH_DIR_INFORMATION nextInfo, prevInfo = NULL;
+	UNICODE_STRING fileName;
+	UINT32 offset, moveLength;
+	BOOLEAN matched, search;
+	NTSTATUS status = STATUS_SUCCESS;
+
+	offset = 0;
+	search = TRUE;
+
+	do
+	{
+		fileName.Buffer = info->FileName;
+		fileName.Length = (USHORT)info->FileNameLength;
+		fileName.MaximumLength = (USHORT)info->FileNameLength;
+
+		if (info->FileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			matched = CheckExcludeListDirFile(g_excludeDirectoryContext, &fltName->Name, &fileName);
+		else
+			matched = CheckExcludeListDirFile(g_excludeFileContext, &fltName->Name, &fileName);
+
+		if (matched)
+		{
+			BOOLEAN retn = FALSE;
+
+			if (prevInfo != NULL)
+			{
+				if (info->NextEntryOffset != 0)
+				{
+					prevInfo->NextEntryOffset += info->NextEntryOffset;
+					offset = info->NextEntryOffset;
+				}
+				else
+				{
+					prevInfo->NextEntryOffset = 0;
+					status = STATUS_SUCCESS;
+					retn = TRUE;
+				}
+
+				RtlFillMemory(info, sizeof(FILE_ID_BOTH_DIR_INFORMATION), 0);
+			}
+			else
+			{
+				if (info->NextEntryOffset != 0)
+				{
+					nextInfo = (PFILE_ID_BOTH_DIR_INFORMATION)((PUCHAR)info + info->NextEntryOffset);
+					moveLength = 0;
+					while (nextInfo->NextEntryOffset != 0)
+					{
+						moveLength += nextInfo->NextEntryOffset;
+						nextInfo = (PFILE_ID_BOTH_DIR_INFORMATION)((PUCHAR)nextInfo + nextInfo->NextEntryOffset);
+					}
+
+					moveLength += FIELD_OFFSET(FILE_ID_BOTH_DIR_INFORMATION, FileName) + nextInfo->FileNameLength;
+					RtlMoveMemory(info, (PUCHAR)info + info->NextEntryOffset, moveLength);//continue
+				}
+				else
+				{
+					status = STATUS_NO_MORE_ENTRIES;
+					retn = TRUE;
+				}
+			}
+
+			LogTrace("Removed from query: %wZ\\%wZ", &fltName->Name, &fileName);
+
+			if (retn)
+				return status;
+
+			info = (PFILE_ID_BOTH_DIR_INFORMATION)((PCHAR)info + offset);
+			continue;
+		}
+
+		offset = info->NextEntryOffset;
+		prevInfo = info;
+		info = (PFILE_ID_BOTH_DIR_INFORMATION)((PCHAR)info + offset);
+
+		if (offset == 0)
+			search = FALSE;
+	} while (search);
+
+	return status;
+}
+
+NTSTATUS CleanFileNamesInformation(PFILE_NAMES_INFORMATION info, PFLT_FILE_NAME_INFORMATION fltName)
+{
+	PFILE_NAMES_INFORMATION nextInfo, prevInfo = NULL;
+	UNICODE_STRING fileName;
+	UINT32 offset, moveLength;
+	BOOLEAN search;
+	NTSTATUS status = STATUS_SUCCESS;
+
+	offset = 0;
+	search = TRUE;
+
+	do
+	{
+		fileName.Buffer = info->FileName;
+		fileName.Length = (USHORT)info->FileNameLength;
+		fileName.MaximumLength = (USHORT)info->FileNameLength;
+
+		//TODO: check, can there be directories?
+		if (CheckExcludeListDirFile(g_excludeFileContext, &fltName->Name, &fileName))
+		{
+			BOOLEAN retn = FALSE;
+
+			if (prevInfo != NULL)
+			{
+				if (info->NextEntryOffset != 0)
+				{
+					prevInfo->NextEntryOffset += info->NextEntryOffset;
+					offset = info->NextEntryOffset;
+				}
+				else
+				{
+					prevInfo->NextEntryOffset = 0;
+					status = STATUS_SUCCESS;
+					retn = TRUE;
+				}
+
+				RtlFillMemory(info, sizeof(FILE_NAMES_INFORMATION), 0);
+			}
+			else
+			{
+				if (info->NextEntryOffset != 0)
+				{
+					nextInfo = (PFILE_NAMES_INFORMATION)((PUCHAR)info + info->NextEntryOffset);
+					moveLength = 0;
+					while (nextInfo->NextEntryOffset != 0)
+					{
+						moveLength += nextInfo->NextEntryOffset;
+						nextInfo = (PFILE_NAMES_INFORMATION)((PUCHAR)nextInfo + nextInfo->NextEntryOffset);
+					}
+
+					moveLength += FIELD_OFFSET(FILE_NAMES_INFORMATION, FileName) + nextInfo->FileNameLength;
+					RtlMoveMemory(info, (PUCHAR)info + info->NextEntryOffset, moveLength);//continue
+				}
+				else
+				{
+					status = STATUS_NO_MORE_ENTRIES;
+					retn = TRUE;
+				}
+			}
+
+			LogTrace("Removed from query: %wZ\\%wZ", &fltName->Name, &fileName);
+
+			if (retn)
+				return status;
+
+			info = (PFILE_NAMES_INFORMATION)((PCHAR)info + offset);
+			continue;
+		}
+
+		offset = info->NextEntryOffset;
+		prevInfo = info;
+		info = (PFILE_NAMES_INFORMATION)((PCHAR)info + offset);
+
+		if (offset == 0)
+			search = FALSE;
+	} while (search);
+
+	return STATUS_SUCCESS;
+}
+
+
+
+
+
+NTSTATUS InitializeFSMiniFilter(PDRIVER_OBJECT DriverObject)
+{
+	NTSTATUS status;
+	UNICODE_STRING str;
+	UINT32 i;
+	ExcludeEntryId id;
+
+	// Initialize and fill exclude file\dir lists 
+
+	status = InitializeExcludeListContext(&g_excludeFileContext, ExcludeFile);
+	if (!NT_SUCCESS(status))
+	{
+		LogError("Exclude file list initialization failed with code:%08x", status);
+		return status;
+	}
+
+	status = InitializeExcludeListContext(&g_excludeDirectoryContext, ExcludeDirectory);
+	if (!NT_SUCCESS(status))
+	{
+		LogError("Exclude file list initialization failed with code:%08x", status);
+		DestroyExcludeListContext(g_excludeFileContext);
+		return status;
+	}
+
+	LogTrace("Initialization is completed");
+	return status;
+}
+
+NTSTATUS DestroyFSMiniFilter()
+{
+	DestroyExcludeListContext(g_excludeFileContext);
+	DestroyExcludeListContext(g_excludeDirectoryContext);
+
+	LogTrace("Deitialization is completed");
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS AddHiddenFile(PUNICODE_STRING FilePath, PULONGLONG ObjId)
+{
+	const USHORT maxBufSize = FilePath->Length + NORMALIZE_INCREAMENT;
+	UNICODE_STRING normalized;
+	NTSTATUS status;
+
+	normalized.Buffer = (PWCH)ExAllocatePoolWithTag(PagedPool, maxBufSize, FSFILTER_ALLOC_TAG);
+	normalized.Length = 0;
+	normalized.MaximumLength = maxBufSize;
+
+	if (!normalized.Buffer)
+	{
+		LogWarning("Error, can't allocate buffer");
+		return STATUS_MEMORY_NOT_ALLOCATED;
+	}
+
+	status = NormalizeDevicePath(FilePath, &normalized);
+	if (!NT_SUCCESS(status))
+	{
+		LogWarning("Path normalization failed with code:%08x, path:%wZ", status, FilePath);
+		ExFreePoolWithTag(normalized.Buffer, FSFILTER_ALLOC_TAG);
+		return status;
+	}
+
+	status = AddExcludeListFile(g_excludeFileContext, &normalized, ObjId, 0);
+	if (NT_SUCCESS(status))
+		LogTrace("Added hidden file:%wZ", &normalized);
+	else
+		LogTrace("Adding hidden file failed with code:%08x, path:%wZ", status, &normalized);
+
+	ExFreePoolWithTag(normalized.Buffer, FSFILTER_ALLOC_TAG);
+
+	return status;
+}
+
+NTSTATUS RemoveHiddenFile(ULONGLONG ObjId)
+{
+	NTSTATUS status = RemoveExcludeListEntry(g_excludeFileContext, ObjId);
+	if (NT_SUCCESS(status))
+		LogTrace("Hidden file is removed, id:%lld", ObjId);
+	else
+		LogTrace("Can't remove hidden file, code:%08x, id:%lld", status, ObjId);
+
+	return status;
+}
+
+NTSTATUS RemoveAllHiddenFiles()
+{
+	NTSTATUS status = RemoveAllExcludeListEntries(g_excludeFileContext);
+	if (NT_SUCCESS(status))
+		LogTrace("All hidden files are removed");
+	else
+		LogTrace("Can't remove all hidden files, code:%08x", status);
+
+	return status;
+}
+
+NTSTATUS AddHiddenDir(PUNICODE_STRING DirPath, PULONGLONG ObjId)
+{
+	const USHORT maxBufSize = DirPath->Length + NORMALIZE_INCREAMENT;
+	UNICODE_STRING normalized;
+	NTSTATUS status;
+
+	normalized.Buffer = (PWCH)ExAllocatePoolWithTag(PagedPool, maxBufSize, FSFILTER_ALLOC_TAG);
+	normalized.Length = 0;
+	normalized.MaximumLength = maxBufSize;
+
+	if (!normalized.Buffer)
+	{
+		LogWarning("Error, can't allocate buffer");
+		return STATUS_MEMORY_NOT_ALLOCATED;
+	}
+
+	status = NormalizeDevicePath(DirPath, &normalized);
+	if (!NT_SUCCESS(status))
+	{
+		LogWarning("Path normalization failed with code:%08x, path:%wZ\n", status, DirPath);
+		ExFreePoolWithTag(normalized.Buffer, FSFILTER_ALLOC_TAG);
+		return status;
+	}
+
+	status = AddExcludeListDirectory(g_excludeDirectoryContext, &normalized, ObjId, 0);
+	if (NT_SUCCESS(status))
+		LogTrace("Added hidden dir:%wZ", &normalized);
+	else
+		LogTrace("Adding hidden dir failed with code:%08x, path:%wZ", status, &normalized);
+
+	ExFreePoolWithTag(normalized.Buffer, FSFILTER_ALLOC_TAG);
+
+	return status;
+}
+
+NTSTATUS RemoveHiddenDir(ULONGLONG ObjId)
+{
+	NTSTATUS status = RemoveExcludeListEntry(g_excludeDirectoryContext, ObjId);
+	if (NT_SUCCESS(status))
+		LogTrace("Hidden dir is removed, id:%lld", ObjId);
+	else
+		LogTrace("Can't remove hidden dir, code:%08x, id:%lld", status, ObjId);
+
+	return status;
+}
+
+NTSTATUS RemoveAllHiddenDirs()
+{
+	NTSTATUS status = RemoveAllExcludeListEntries(g_excludeDirectoryContext);
+	if (NT_SUCCESS(status))
+		LogTrace("All hidden dirs are removed");
+	else
+		LogTrace("Can't remove all hidden dirs, code:%08x", status);
+
+	return status;
 }

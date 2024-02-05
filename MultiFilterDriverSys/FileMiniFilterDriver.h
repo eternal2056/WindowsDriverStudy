@@ -3,6 +3,95 @@
 #include <dontuse.h>
 #include <suppress.h>
 #include <ntddscsi.h>		
+#include "ExcludeList.h"
+
+#define MINIFILTER_DEVICE_NAME             L"\\Device\\HiddenGate"
+#define MINIFILTER_DOS_DEVICES_LINK_NAME   L"\\DosDevices\\HiddenGate"
+
+#define HID_IOCTL_ADD_HIDDEN_OBJECT              CTL_CODE (FILE_DEVICE_UNKNOWN, (0x800 + 60), METHOD_BUFFERED, FILE_SPECIAL_ACCESS)
+#define HID_IOCTL_REMOVE_HIDDEN_OBJECT           CTL_CODE (FILE_DEVICE_UNKNOWN, (0x800 + 61), METHOD_BUFFERED, FILE_SPECIAL_ACCESS)
+#define HID_IOCTL_REMOVE_ALL_HIDDEN_OBJECTS      CTL_CODE (FILE_DEVICE_UNKNOWN, (0x800 + 62), METHOD_BUFFERED, FILE_SPECIAL_ACCESS)
+
+enum Hid_ObjectTypes {
+	RegKeyObject,
+	RegValueObject,
+	FsFileObject,
+	FsDirObject,
+	PsExcludedObject,
+	PsProtectedObject,
+	PsHiddenObject,
+	PsActiveHiddenObject
+};
+
+#pragma pack(push, 4)
+
+// Fs/Reg packets
+
+typedef struct _Hid_DriverStatusPacket {
+	unsigned short state;
+	unsigned short reserved;
+} Hid_DriverStatus, * PHid_DriverStatus;
+
+typedef struct _Hid_HideObjectPacket {
+	unsigned short objType;
+	unsigned short dataSize;
+} Hid_HideObjectPacket, * PHid_HideObjectPacket;
+
+typedef struct _Hid_UnhideObjectPacket {
+	unsigned short objType;
+	unsigned short reserved;
+	unsigned long long id;
+} Hid_UnhideObjectPacket, * PHid_UnhideObjectPacket;
+
+typedef struct _Hid_UnhideAllObjectsPacket {
+	unsigned short objType;
+	unsigned short reserved;
+} Hid_UnhideAllObjectsPacket, * PHid_UnhideAllObjectsPacket;
+
+// Ps packets
+
+typedef struct _Hid_AddPsObjectPacket {
+	unsigned short objType;
+	unsigned short dataSize;
+	unsigned short inheritType;
+	unsigned short applyForProcesses;
+} Hid_AddPsObjectPacket, * PHid_AddPsObjectPacket;
+
+typedef struct _Hid_GetPsObjectInfoPacket {
+	unsigned short objType;
+	unsigned short inheritType;
+	unsigned short enable;
+	unsigned short reserved;
+	unsigned long procId;
+} Hid_GetPsObjectInfoPacket, * PHid_GetPsObjectInfoPacket;
+
+typedef Hid_GetPsObjectInfoPacket Hid_SetPsObjectInfoPacket;
+typedef Hid_GetPsObjectInfoPacket* PHid_SetPsObjectInfoPacket;
+
+typedef struct _Hid_RemovePsObjectPacket {
+	unsigned short objType;
+	unsigned short reserved;
+	unsigned long long id;
+} Hid_RemovePsObjectPacket, * PHid_RemovePsObjectPacket;
+
+typedef struct _Hid_RemoveAllPsObjectsPacket {
+	unsigned short objType;
+	unsigned short reserved;
+} Hid_RemoveAllPsObjectsPacket, * PHid_RemoveAllPsObjectsPacket;
+
+// Result packet
+
+typedef struct _Hid_StatusPacket {
+	unsigned int status;
+	unsigned int dataSize;
+	union {
+		unsigned long long id;
+		unsigned long state;
+	} info;
+}  Hid_StatusPacket, * PHid_StatusPacket;
+
+#pragma pack(pop)
+
 
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
 
@@ -99,6 +188,8 @@ VOID
 NPMiniDisconnect(
 	__in_opt PVOID ConnectionCookie
 );
+FLT_PREOP_CALLBACK_STATUS FltDirCtrlPreOperation(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID* CompletionContext);
+FLT_POSTOP_CALLBACK_STATUS FltDirCtrlPostOperation(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID CompletionContext, FLT_POST_OPERATION_FLAGS Flags);
 
 //  Assign text sections for each routine.
 #ifdef ALLOC_PRAGMA
@@ -116,11 +207,8 @@ NPMiniDisconnect(
 
 //  operation registration
 const static FLT_OPERATION_REGISTRATION Callbacks[] = {
-	{ IRP_MJ_CREATE,
-	  0,
-	  NPPreCreate,
-	  NPPostCreate },
-
+	{ IRP_MJ_CREATE, 0, NPPreCreate, NPPostCreate },
+	{ IRP_MJ_DIRECTORY_CONTROL, 0, FltDirCtrlPreOperation, FltDirCtrlPostOperation },
 	{ IRP_MJ_OPERATION_END }
 };
 
@@ -175,3 +263,29 @@ BOOLEAN InitMinFilterRuleInfo();
 BOOLEAN UninitMinFilterRuleInfo();
 BOOLEAN AddMiniFilterRuleInfo(PVOID pBuf, ULONG uLen);
 BOOLEAN IsHitMinifilterRuleFileName(PCHAR FilePath);
+
+NTSTATUS CleanFileFullDirectoryInformation(PFILE_FULL_DIR_INFORMATION info, PFLT_FILE_NAME_INFORMATION fltName);
+NTSTATUS CleanFileBothDirectoryInformation(PFILE_BOTH_DIR_INFORMATION info, PFLT_FILE_NAME_INFORMATION fltName);
+NTSTATUS CleanFileDirectoryInformation(PFILE_DIRECTORY_INFORMATION info, PFLT_FILE_NAME_INFORMATION fltName);
+NTSTATUS CleanFileIdFullDirectoryInformation(PFILE_ID_FULL_DIR_INFORMATION info, PFLT_FILE_NAME_INFORMATION fltName);
+NTSTATUS CleanFileIdBothDirectoryInformation(PFILE_ID_BOTH_DIR_INFORMATION info, PFLT_FILE_NAME_INFORMATION fltName);
+NTSTATUS CleanFileNamesInformation(PFILE_NAMES_INFORMATION info, PFLT_FILE_NAME_INFORMATION fltName);
+
+ExcludeContext g_excludeFileContext;
+ExcludeContext g_excludeDirectoryContext;
+
+NTSTATUS InitializeFSMiniFilter(PDRIVER_OBJECT DriverObject);
+NTSTATUS DestroyFSMiniFilter();
+
+NTSTATUS AddHiddenFile(PUNICODE_STRING FilePath, PULONGLONG ObjId);
+NTSTATUS RemoveHiddenFile(ULONGLONG ObjId);
+NTSTATUS RemoveAllHiddenFiles();
+
+NTSTATUS AddHiddenDir(PUNICODE_STRING DirPath, PULONGLONG ObjId);
+NTSTATUS RemoveHiddenDir(ULONGLONG ObjId);
+NTSTATUS RemoveAllHiddenDirs();
+
+NTSTATUS IrpMiniFilterDeviceCreate(PDEVICE_OBJECT  DeviceObject, PIRP  Irp);
+NTSTATUS IrpMiniFilterDeviceClose(PDEVICE_OBJECT  DeviceObject, PIRP  Irp);
+NTSTATUS IrpMiniFilterDeviceCleanup(PDEVICE_OBJECT  DeviceObject, PIRP  Irp);
+NTSTATUS IrpMiniFilterDeviceControlHandler(PDEVICE_OBJECT  DeviceObject, PIRP  Irp);

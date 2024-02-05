@@ -19,11 +19,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <Inf Include="MultiFilterDriverSys.inf">
-      <Filter>Driver Files</Filter>
-    </Inf>
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="WfpSample.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -42,25 +37,42 @@
     <ClCompile Include="Tools.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Helper.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ExcludeList.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Rule.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="WfpSample.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="CoverProcess.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="FileMiniFilterDriver.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="CoverProcess.h">
-      <Filter>Header Files</Filter>
+      <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Main.h">
-      <Filter>Header Files</Filter>
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Rule.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Tools.h">
-      <Filter>Header Files</Filter>
+      <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="WfpSample.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Helper.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ExcludeList.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Inf Include="MultiFilterDriverSys.inf">
+      <Filter>Source Files</Filter>
+    </Inf>
   </ItemGroup>
 </Project>

@@ -153,7 +153,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CoverProcess.c" />
+    <ClCompile Include="ExcludeList.c" />
     <ClCompile Include="FileMiniFilterDriver.c" />
+    <ClCompile Include="Helper.c" />
     <ClCompile Include="Main.c" />
     <ClCompile Include="Rule.c" />
     <ClCompile Include="Tools.c" />
@@ -161,7 +163,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoverProcess.h" />
+    <ClInclude Include="ExcludeList.h" />
     <ClInclude Include="FileMiniFilterDriver.h" />
+    <ClInclude Include="Helper.h" />
     <ClInclude Include="Main.h" />
     <ClInclude Include="Rule.h" />
     <ClInclude Include="Tools.h" />
