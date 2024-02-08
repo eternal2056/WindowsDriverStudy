@@ -119,26 +119,57 @@ void getProcessName(HANDLE hDevice, int processId) {
 	std::cout << "Write " << sizeof(PROCESS_MY) << " bytes to the device." << std::endl;
 }
 
-int ControlMain(int argc, CHAR* argv[]) {
-	// 打开设备
-	HANDLE hDevice = CreateFile(
-		KILLRULE_USER_SYMBOLINK,
-		GENERIC_READ | GENERIC_WRITE,
-		0,
-		NULL,
-		OPEN_EXISTING,
-		FILE_ATTRIBUTE_NORMAL,
-		NULL
-	);
 
-	if (hDevice == INVALID_HANDLE_VALUE) {
-		std::cerr << "Failed to open device. Error code: " << GetLastError() << std::endl;
-		return -1;
+void SendIoctl_HideObjectPacket(HANDLE hDevice, const wchar_t* path)
+{
+	PHidContextInternal context = (PHidContextInternal)malloc(sizeof(HidContextInternal));
+	context->hdevice = hDevice;
+
+	PHid_HideObjectPacket hide;
+	Hid_StatusPacket result;
+	size_t size, len, total;
+	DWORD returned;
+
+	len = wcslen(path);
+
+	// Pack data to packet
+
+	total = (len + 1) * sizeof(wchar_t);
+	size = sizeof(Hid_HideObjectPacket) + total;
+	hide = (PHid_HideObjectPacket)_alloca(size);
+	hide->dataSize = (unsigned short)total;
+	hide->objType = FsFileObject;
+
+	memcpy((char*)hide + sizeof(Hid_HideObjectPacket), path, total);
+
+	// Send IOCTL to device
+	std::cout << "Write " << sizeof(Hid_HideObjectPacket) << " bytes to the device." << std::endl;
+	if (!DeviceIoControl(context->hdevice, HID_IOCTL_ADD_HIDDEN_OBJECT, hide, (DWORD)size, &result, sizeof(result), &returned, NULL)) {
+
 	}
+}
+
+int ControlMain(int argc, CHAR* argv[]) {
+	HANDLE hDevice = NULL;
 	int processId;
 	std::string param2 = argv[2];
 
 	if (param2 == "CoverProcess") {
+		// 打开设备
+		hDevice = CreateFile(
+			KILLRULE_USER_SYMBOLINK,
+			GENERIC_READ | GENERIC_WRITE,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL,
+			NULL
+		);
+
+		if (hDevice == INVALID_HANDLE_VALUE) {
+			std::cerr << "Failed to open device. Error code: " << GetLastError() << std::endl;
+			return -1;
+		}
 		std::string param3 = argv[3];
 		processId = std::stoi(param3);
 
@@ -147,6 +178,30 @@ int ControlMain(int argc, CHAR* argv[]) {
 		//writeToDeviceStucture(hDevice);
 		//getProcessNameTest(hDevice);
 		getProcessName(hDevice, processId);
+	}
+	if (param2 == "HideFile") {
+
+		// 打开设备
+		hDevice = CreateFile(
+			MINIFILTER_USER_DEVICES_LINK_NAME,
+			GENERIC_READ | GENERIC_WRITE,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL,
+			NULL
+		);
+
+		if (hDevice == INVALID_HANDLE_VALUE) {
+			std::cerr << "Failed to open device. Error code: " << GetLastError() << std::endl;
+			return -1;
+		}
+
+		std::string path = argv[3];
+		int wideStrLength = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, NULL, 0);
+		wchar_t* wideStrBuffer = new wchar_t[wideStrLength];
+		MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, wideStrBuffer, wideStrLength);
+		SendIoctl_HideObjectPacket(hDevice, wideStrBuffer);
 	}
 
 	// 关闭设备句柄
