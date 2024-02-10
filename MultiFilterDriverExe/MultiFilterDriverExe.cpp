@@ -30,7 +30,7 @@ void readAndPrintFile(const std::string& filePath, std::vector<std::string>& for
 }
 
 /*
- * MultiFilterDriverExe.exe Minifilter AddExe CHROME.EXE
+ * MultiFilterDriverExe.exe Minifilter AddExe CHROME.EXE					#
  * MultiFilterDriverExe.exe Minifilter AddExeList
  * MultiFilterDriverExe.exe Minifilter RemoveRule
  *
@@ -42,6 +42,10 @@ void readAndPrintFile(const std::string& filePath, std::vector<std::string>& for
  * MultiFilterDriverExe.exe WFP RemoteIp 192.168.1.4
  *
  * MultiFilterDriverExe.exe Control CoverProcess [ProcessId]
+ * MultiFilterDriverExe.exe Control HideFile \??\C:\HOME\CodeTest\1.exe
+ * MultiFilterDriverExe.exe Control HideFileRecovery
+ * MultiFilterDriverExe.exe Control HideDir \??\C:\HOME\CodeTest
+ * MultiFilterDriverExe.exe Control HideDirRecovery
  *
  */
 

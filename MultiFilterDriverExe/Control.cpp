@@ -120,7 +120,7 @@ void getProcessName(HANDLE hDevice, int processId) {
 }
 
 
-void SendIoctl_HideObjectPacket(HANDLE hDevice, const wchar_t* path)
+void SendIoctl_HideObjectPacket(HANDLE hDevice, const wchar_t* path, unsigned short type)
 {
 	PHidContextInternal context = (PHidContextInternal)malloc(sizeof(HidContextInternal));
 	context->hdevice = hDevice;
@@ -138,13 +138,32 @@ void SendIoctl_HideObjectPacket(HANDLE hDevice, const wchar_t* path)
 	size = sizeof(Hid_HideObjectPacket) + total;
 	hide = (PHid_HideObjectPacket)_alloca(size);
 	hide->dataSize = (unsigned short)total;
-	hide->objType = FsFileObject;
+	hide->objType = type;
 
 	memcpy((char*)hide + sizeof(Hid_HideObjectPacket), path, total);
 
 	// Send IOCTL to device
 	std::cout << "Write " << sizeof(Hid_HideObjectPacket) << " bytes to the device." << std::endl;
 	if (!DeviceIoControl(context->hdevice, HID_IOCTL_ADD_HIDDEN_OBJECT, hide, (DWORD)size, &result, sizeof(result), &returned, NULL)) {
+
+	}
+}
+
+void SendIoctl_UnHideObjectPacket(HANDLE hDevice, unsigned short type)
+{
+	PHidContextInternal context = (PHidContextInternal)malloc(sizeof(HidContextInternal));
+	context->hdevice = hDevice;
+
+	Hid_StatusPacket result;
+	size_t size, len, total;
+	DWORD returned;
+	Hid_UnhideAllObjectsPacket unhide;
+
+	unhide.objType = type;
+
+	// Send IOCTL to device
+	std::cout << "Write " << sizeof(Hid_HideObjectPacket) << " bytes to the device." << std::endl;
+	if (!DeviceIoControl(context->hdevice, HID_IOCTL_REMOVE_ALL_HIDDEN_OBJECTS, &unhide, sizeof(unhide), &result, sizeof(result), &returned, NULL)) {
 
 	}
 }
@@ -179,6 +198,26 @@ int ControlMain(int argc, CHAR* argv[]) {
 		//getProcessNameTest(hDevice);
 		getProcessName(hDevice, processId);
 	}
+	if (param2 == "HideFileRecovery") {
+
+		// 打开设备
+		hDevice = CreateFile(
+			MINIFILTER_USER_DEVICES_LINK_NAME,
+			GENERIC_READ | GENERIC_WRITE,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL,
+			NULL
+		);
+
+		if (hDevice == INVALID_HANDLE_VALUE) {
+			std::cerr << "Failed to open device. Error code: " << GetLastError() << std::endl;
+			return -1;
+		}
+
+		SendIoctl_UnHideObjectPacket(hDevice, FsFileObject);
+	}
 	if (param2 == "HideFile") {
 
 		// 打开设备
@@ -201,7 +240,52 @@ int ControlMain(int argc, CHAR* argv[]) {
 		int wideStrLength = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, NULL, 0);
 		wchar_t* wideStrBuffer = new wchar_t[wideStrLength];
 		MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, wideStrBuffer, wideStrLength);
-		SendIoctl_HideObjectPacket(hDevice, wideStrBuffer);
+		SendIoctl_HideObjectPacket(hDevice, wideStrBuffer, FsFileObject);
+	}
+
+	if (param2 == "HideDirRecovery") {
+
+		// 打开设备
+		hDevice = CreateFile(
+			MINIFILTER_USER_DEVICES_LINK_NAME,
+			GENERIC_READ | GENERIC_WRITE,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL,
+			NULL
+		);
+
+		if (hDevice == INVALID_HANDLE_VALUE) {
+			std::cerr << "Failed to open device. Error code: " << GetLastError() << std::endl;
+			return -1;
+		}
+
+		SendIoctl_UnHideObjectPacket(hDevice, FsDirObject);
+	}
+	if (param2 == "HideDir") {
+
+		// 打开设备
+		hDevice = CreateFile(
+			MINIFILTER_USER_DEVICES_LINK_NAME,
+			GENERIC_READ | GENERIC_WRITE,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL,
+			NULL
+		);
+
+		if (hDevice == INVALID_HANDLE_VALUE) {
+			std::cerr << "Failed to open device. Error code: " << GetLastError() << std::endl;
+			return -1;
+		}
+
+		std::string path = argv[3];
+		int wideStrLength = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, NULL, 0);
+		wchar_t* wideStrBuffer = new wchar_t[wideStrLength];
+		MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, wideStrBuffer, wideStrLength);
+		SendIoctl_HideObjectPacket(hDevice, wideStrBuffer, FsDirObject);
 	}
 
 	// 关闭设备句柄
