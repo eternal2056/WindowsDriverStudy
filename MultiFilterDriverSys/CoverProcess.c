@@ -1,5 +1,156 @@
 ﻿#include "CoverProcess.h"
 
+typedef __int64(__fastcall* FChangeWindowTreeProtection)(void* a1, int a2);
+FChangeWindowTreeProtection g_ChangeWindowTreeProtection = 0;
+
+typedef __int64(__fastcall* FValidateHwnd)(__int64 a1);
+FValidateHwnd g_ValidateHwnd = 0;
+
+// 获取模块基址
+BOOLEAN get_module_base_address(const char* name, unsigned long long* addr, unsigned long* size)
+{
+	unsigned long need_size = 0;
+	ZwQuerySystemInformation(11, &need_size, 0, &need_size);
+	if (need_size == 0) return FALSE;
+
+	const unsigned long tag = 'VMON';
+	PSYSTEM_MODULE_INFORMATION sys_mods = (PSYSTEM_MODULE_INFORMATION)ExAllocatePoolWithTag(NonPagedPool, need_size, tag);
+	if (sys_mods == 0) return FALSE;
+
+	NTSTATUS status = ZwQuerySystemInformation(11, sys_mods, need_size, 0);
+	if (!NT_SUCCESS(status))
+	{
+		ExFreePoolWithTag(sys_mods, tag);
+		return FALSE;
+	}
+
+	for (unsigned long long i = 0; i < sys_mods->ulModuleCount; i++)
+	{
+		PSYSTEM_MODULE mod = &sys_mods->Modules[i];
+		if (strstr(mod->ImageName, name))
+		{
+			*addr = (unsigned long long)mod->Base;
+			*size = (unsigned long)mod->Size;
+			break;
+		}
+	}
+
+	ExFreePoolWithTag(sys_mods, tag);
+	return TRUE;
+}
+
+// 模式匹配
+BOOLEAN pattern_check(const char* data, const char* pattern, const char* mask)
+{
+	size_t len = strlen(mask);
+
+	for (size_t i = 0; i < len; i++)
+	{
+		if (data[i] == pattern[i] || mask[i] == '?')
+			continue;
+		else
+			return FALSE;
+	}
+
+	return TRUE;
+}
+unsigned long long find_pattern(unsigned long long addr, unsigned long size, const char* pattern, const char* mask)
+{
+	size -= (unsigned long)strlen(mask);
+
+	for (unsigned long i = 0; i < size; i++)
+	{
+		if (pattern_check((const char*)addr + i, pattern, mask))
+			return addr + i;
+	}
+
+	return 0;
+}
+unsigned long long find_pattern_image(unsigned long long addr, const char* pattern, const char* mask)
+{
+	PIMAGE_DOS_HEADER dos = (PIMAGE_DOS_HEADER)addr;
+	if (dos->e_magic != IMAGE_DOS_SIGNATURE)
+		return 0;
+
+	PIMAGE_NT_HEADERS64 nt = (PIMAGE_NT_HEADERS64)(addr + dos->e_lfanew);
+	if (nt->Signature != IMAGE_NT_SIGNATURE)
+		return 0;
+
+	PIMAGE_SECTION_HEADER section = IMAGE_FIRST_SECTION(nt);
+
+	for (unsigned short i = 0; i < nt->FileHeader.NumberOfSections; i++)
+	{
+		PIMAGE_SECTION_HEADER p = &section[i];
+
+		if (strstr((const char*)p->Name, ".text") || 'EGAP' == *(int*)(p->Name))
+		{
+			unsigned long long res = find_pattern(addr + p->VirtualAddress, p->Misc.VirtualSize, pattern, mask);
+			if (res) return res;
+		}
+	}
+
+	return 0;
+}
+
+// 获取导出函数
+void* get_system_base_export(const char* module_name, const char* routine_name)
+{
+	unsigned long long win32kbase_address = 0;
+	unsigned long win32kbase_length = 0;
+	get_module_base_address(module_name, &win32kbase_address, &win32kbase_length);
+	DbgPrintEx(0, 0, "[+] %s base address is 0x%llX \n", module_name, win32kbase_address);
+	//if (MmIsAddressValid((void*)win32kbase_address) == FALSE) return 0;
+
+	return RtlFindExportedRoutineByName((void*)win32kbase_address, routine_name);
+}
+
+// 初始化
+BOOLEAN initialize()
+{
+	unsigned long long win32kfull_address = 0;
+	unsigned long win32kfull_length = 0;
+	get_module_base_address("win32kfull.sys", &win32kfull_address, &win32kfull_length);
+	DbgPrintEx(0, 0, "[+] win32kfull base address is 0x%llX \n", win32kfull_address);
+	//DbgBreakPoint();
+	//if (MmIsAddressValid((void*)win32kfull_address) == FALSE) return false;
+
+	/*
+	call    ?ChangeWindowTreeProtection@@YAHPEAUtagWND@@H@Z ; ChangeWindowTreeProtection(tagWND *,int)
+	mov     esi, eax
+	test    eax, eax
+	jnz     short loc_1C0245002
+	*/
+	unsigned long long address = find_pattern_image(win32kfull_address,
+		"\xE8\x00\x00\x00\x00\x8B\xF0\x85\xC0\x75\x00\x44\x8B\x44",
+		"x????xxxxx?xxx");
+	DbgPrintEx(0, 0, "[+] pattern address is 0x%llX \n", address);
+	if (address == 0) return FALSE;
+
+	// 5=汇编指令长度
+	// 1=偏移
+	g_ChangeWindowTreeProtection = (FChangeWindowTreeProtection)((char*)(address)+5 + *(int*)((char*)(address)+1));
+	DbgPrintEx(0, 0, "[+] ChangeWindowTreeProtection address is 0x%p \n", g_ChangeWindowTreeProtection);
+	if (MmIsAddressValid(g_ChangeWindowTreeProtection) == FALSE) return FALSE;
+
+	g_ValidateHwnd = (FValidateHwnd)get_system_base_export("win32kbase.sys", "ValidateHwnd");
+	DbgPrintEx(0, 0, "[+] ValidateHwnd address is 0x%p \n", g_ValidateHwnd);
+	if (MmIsAddressValid(g_ValidateHwnd) == FALSE) return FALSE;
+
+	return TRUE;
+}
+
+// 修改窗口状态
+__int64 change_window_attributes(__int64 handler, int attributes)
+{
+	if (MmIsAddressValid(g_ChangeWindowTreeProtection) == FALSE) return 0;
+	if (MmIsAddressValid(g_ValidateHwnd) == FALSE) return 0;
+
+	void* wnd_ptr = (void*)g_ValidateHwnd(handler);
+	if (MmIsAddressValid(wnd_ptr) == FALSE) return 0;
+
+	return g_ChangeWindowTreeProtection(wnd_ptr, attributes);
+}
+
 VOID CoverProcessDriverUnload(DRIVER_OBJECT* DriverObject) {
 	UNICODE_STRING symbolicLinkName;
 
@@ -227,6 +378,7 @@ NTSTATUS MainDispatcher(PDEVICE_OBJECT devobj, PIRP irp)
 	ULONG inlen = 0;
 	ULONG outlen = 0;
 	ULONG ctlcode = 0;
+	PMyMessage64 info = NULL;
 	PROCESS_MY* op = 0;
 
 	irpstack = IoGetCurrentIrpStackLocation(irp);
@@ -270,6 +422,18 @@ NTSTATUS MainDispatcher(PDEVICE_OBJECT devobj, PIRP irp)
 		//status = StorageDispatcher(op, devobj, irp);
 		break;
 	case IOCTL_KILLRULE_OBJECT:
+		//status = ObjectDispatcher(op, devobj, inbuf, inlen, outbuf, outlen, irp);
+		break;
+	case HIDE_WINDOW:
+		info = (MyMessage64*)inbuf;
+		if (ctlcode == HIDE_WINDOW && MmIsAddressValid(info))
+		{
+			// 初始化
+			static BOOLEAN init = FALSE;
+			if (!init) init = initialize();
+
+			info->window_result = change_window_attributes(info->window_handle, info->window_attributes);
+		}
 		//status = ObjectDispatcher(op, devobj, inbuf, inlen, outbuf, outlen, irp);
 		break;
 	case IOCTL_KILLRULE_PROCESS:

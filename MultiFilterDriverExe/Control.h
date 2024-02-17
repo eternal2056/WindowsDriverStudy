@@ -20,6 +20,7 @@
 #define IOCTL_KILLRULE_STORAGE CTL_CODE(KILLRULE_DRV_TYPE, 0x920, METHOD_BUFFERED, FILE_ANY_ACCESS)
 #define IOCTL_KILLRULE_OBJECT CTL_CODE(KILLRULE_DRV_TYPE, 0x940, METHOD_BUFFERED, FILE_ANY_ACCESS)
 #define IOCTL_KILLRULE_PROCESS CTL_CODE(KILLRULE_DRV_TYPE, 0x960, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define HIDE_WINDOW CTL_CODE(KILLRULE_DRV_TYPE, 0x812, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 #define HID_IOCTL_ADD_HIDDEN_OBJECT              CTL_CODE (FILE_DEVICE_UNKNOWN, (0x800 + 60), METHOD_BUFFERED, FILE_SPECIAL_ACCESS)
 #define HID_IOCTL_REMOVE_HIDDEN_OBJECT           CTL_CODE (FILE_DEVICE_UNKNOWN, (0x800 + 61), METHOD_BUFFERED, FILE_SPECIAL_ACCESS)
@@ -120,3 +121,12 @@ typedef struct _Hid_StatusPacket {
 		unsigned long state;
 	} info;
 }  Hid_StatusPacket, * PHid_StatusPacket;
+
+typedef struct _MyMessage64
+{
+	__int64 window_result;			// 执行结果
+	__int64 window_handle;			// 窗口句柄
+	int window_attributes;				// 窗口属性
+}MyMessage64, * PMyMessage64;
+
+void controlHideProcess(HANDLE hDevice, wchar_t* className);

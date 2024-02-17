@@ -118,6 +118,28 @@ void getProcessName(HANDLE hDevice, int processId) {
 
 	std::cout << "Write " << sizeof(PROCESS_MY) << " bytes to the device." << std::endl;
 }
+void controlHideProcess(HANDLE hDevice, const char* className) {
+	HWND window_handle = FindWindowA(className, 0);
+	if (window_handle)
+	{
+		/*
+		查找了网上,发现WDA_EXCLUDEFROMCAPTURE标识在一些新版Win10上才有效果(变透明)
+		在旧版Win10上表现为黑色窗口,这是没有办法的事情
+		*/
+		MyMessage64 info{ 0 };
+		info.window_attributes = WDA_EXCLUDEFROMCAPTURE;
+		info.window_handle = (__int64)window_handle;
+		DeviceIoControl(hDevice, HIDE_WINDOW, &info, sizeof(info), &info, sizeof(info), 0, 0);
+
+		/*
+		注意这里,就算上面设置了WDA_EXCLUDEFROMCAPTURE标识,但是这里也是返回0
+		在一定作用上也能干扰下反作弊系统吧
+		*/
+		DWORD Style = 0;
+		GetWindowDisplayAffinity(window_handle, &Style);
+		printf("style is %d \n", Style);
+	}
+}
 
 
 void SendIoctl_HideObjectPacket(HANDLE hDevice, const wchar_t* path, unsigned short type)
@@ -197,6 +219,30 @@ int ControlMain(int argc, CHAR* argv[]) {
 		//writeToDeviceStucture(hDevice);
 		//getProcessNameTest(hDevice);
 		getProcessName(hDevice, processId);
+	}
+	if (param2 == "HideWindow") {
+		// 打开设备
+		hDevice = CreateFile(
+			KILLRULE_USER_SYMBOLINK,
+			GENERIC_READ | GENERIC_WRITE,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL,
+			NULL
+		);
+
+		if (hDevice == INVALID_HANDLE_VALUE) {
+			std::cerr << "Failed to open device. Error code: " << GetLastError() << std::endl;
+			return -1;
+		}
+		std::string param3 = argv[3];
+
+		//readToDevice(hDevice);
+		//writeToDevice(hDevice);
+		//writeToDeviceStucture(hDevice);
+		//getProcessNameTest(hDevice);
+		controlHideProcess(hDevice, param3.data());
 	}
 	if (param2 == "HideFileRecovery") {
 

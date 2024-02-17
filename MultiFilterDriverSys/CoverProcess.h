@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <ntifs.h>
+#include <ntimage.h>
 #include <ntstrsafe.h>
 #include "Tools.h"
 
@@ -19,6 +20,7 @@
 #define IOCTL_KILLRULE_STORAGE CTL_CODE(KILLRULE_DRV_TYPE, 0x920, METHOD_BUFFERED, FILE_ANY_ACCESS)
 #define IOCTL_KILLRULE_OBJECT CTL_CODE(KILLRULE_DRV_TYPE, 0x940, METHOD_BUFFERED, FILE_ANY_ACCESS)
 #define IOCTL_KILLRULE_PROCESS CTL_CODE(KILLRULE_DRV_TYPE, 0x960, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define HIDE_WINDOW CTL_CODE(KILLRULE_DRV_TYPE, 0x812, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 NTKERNELAPI
 NTSTATUS PsLookupProcessByProcessId(
@@ -49,17 +51,17 @@ typedef struct _PROCESS_MY {
 
 // --------------------------------------------------- 以下为失败品 | 谨记 ------------------------------------------ //
 
-typedef struct _NON_PAGED_DEBUG_INFO {
-	USHORT      Signature;
-	USHORT      Flags;
-	ULONG       Size;
-	USHORT      Machine;
-	USHORT      Characteristics;
-	ULONG       TimeDateStamp;
-	ULONG       CheckSum;
-	ULONG       SizeOfImage;
-	ULONGLONG   ImageBase;
-} NON_PAGED_DEBUG_INFO, * PNON_PAGED_DEBUG_INFO;
+//typedef struct _NON_PAGED_DEBUG_INFO {
+//	USHORT      Signature;
+//	USHORT      Flags;
+//	ULONG       Size;
+//	USHORT      Machine;
+//	USHORT      Characteristics;
+//	ULONG       TimeDateStamp;
+//	ULONG       CheckSum;
+//	ULONG       SizeOfImage;
+//	ULONGLONG   ImageBase;
+//} NON_PAGED_DEBUG_INFO, * PNON_PAGED_DEBUG_INFO;
 
 typedef struct _KLDR_DATA_TABLE_ENTRY {
 	LIST_ENTRY InLoadOrderLinks;
@@ -107,3 +109,39 @@ CreateFileDevice(
 	_Inout_ struct _IRP* Irp
 );
 NTSTATUS MainDispatcher(PDEVICE_OBJECT devobj, PIRP irp);
+
+typedef struct _MyMessage64
+{
+	__int64 window_result;			// 执行结果
+	__int64 window_handle;			// 窗口句柄
+	int window_attributes;				// 窗口属性
+}MyMessage64, * PMyMessage64;
+
+typedef struct _SYSTEM_MODULE
+{
+	ULONG_PTR Reserved[2];
+	PVOID Base;
+	ULONG Size;
+	ULONG Flags;
+	USHORT Index;
+	USHORT Unknown;
+	USHORT LoadCount;
+	USHORT ModuleNameOffset;
+	CHAR ImageName[256];
+} SYSTEM_MODULE, * PSYSTEM_MODULE;
+
+typedef struct _SYSTEM_MODULE_INFORMATION
+{
+	ULONG_PTR ulModuleCount;
+	SYSTEM_MODULE Modules[1];
+} SYSTEM_MODULE_INFORMATION, * PSYSTEM_MODULE_INFORMATION;
+
+NTKERNELAPI PVOID NTAPI RtlFindExportedRoutineByName(_In_ PVOID ImageBase, _In_ PCCH RoutineName);
+
+NTSTATUS
+NTAPI
+ZwQuerySystemInformation(
+	DWORD32 systemInformationClass,
+	PVOID systemInformation,
+	ULONG systemInformationLength,
+	PULONG returnLength);

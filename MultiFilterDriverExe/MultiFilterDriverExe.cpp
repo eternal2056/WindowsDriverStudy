@@ -30,22 +30,23 @@ void readAndPrintFile(const std::string& filePath, std::vector<std::string>& for
 }
 
 /*
- * MultiFilterDriverExe.exe Minifilter AddExe CHROME.EXE					#
- * MultiFilterDriverExe.exe Minifilter AddExeList
- * MultiFilterDriverExe.exe Minifilter RemoveRule
+ * MultiFilterDriverExe.exe Minifilter AddExe CHROME.EXE					# 拦截启动 CHROME.EXE
+ * MultiFilterDriverExe.exe Minifilter AddExeList							# 拦截启动 一次性多个
+ * MultiFilterDriverExe.exe Minifilter RemoveRule							# 恢复正常
  *
- * MultiFilterDriverExe.exe WFP RemotePort 433
- * MultiFilterDriverExe.exe WFP RemotePort 80
- * MultiFilterDriverExe.exe WFP RemoveRule
- * MultiFilterDriverExe.exe WFP AddressListAdd
- * MultiFilterDriverExe.exe WFP AddressAdd bilibili.com
- * MultiFilterDriverExe.exe WFP RemoteIp 192.168.1.4
+ * MultiFilterDriverExe.exe WFP RemotePort 433								# 拦截目标端口433的请求
+ * MultiFilterDriverExe.exe WFP RemotePort 80								# 拦截目标端口 80的请求
+ * MultiFilterDriverExe.exe WFP RemoveRule									# 恢复正常
+ * MultiFilterDriverExe.exe WFP AddressListAdd								# 拦截URL 一次性多个
+ * MultiFilterDriverExe.exe WFP AddressAdd bilibili.com						# 拦截URL bilibili
+ * MultiFilterDriverExe.exe WFP RemoteIp 192.168.1.4						# 拦截目标IP为 192.168.1.4请求
  *
- * MultiFilterDriverExe.exe Control CoverProcess [ProcessId]
- * MultiFilterDriverExe.exe Control HideFile \??\C:\HOME\CodeTest\1.exe
- * MultiFilterDriverExe.exe Control HideFileRecovery
- * MultiFilterDriverExe.exe Control HideDir \??\C:\HOME\CodeTest
- * MultiFilterDriverExe.exe Control HideDirRecovery
+ * MultiFilterDriverExe.exe Control CoverProcess [ProcessId]				# 隐藏进程 通过PID
+ * MultiFilterDriverExe.exe Control HideWindow [ClassName]					# 隐藏窗口 通过ClassName 阻挡录屏和截图
+ * MultiFilterDriverExe.exe Control HideFile \??\C:\HOME\CodeTest\1.exe		# 隐藏文件
+ * MultiFilterDriverExe.exe Control HideFileRecovery						# 恢复正常
+ * MultiFilterDriverExe.exe Control HideDir \??\C:\HOME\CodeTest			# 隐藏文件夹
+ * MultiFilterDriverExe.exe Control HideDirRecovery							# 恢复正常
  *
  */
 
