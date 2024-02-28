@@ -510,7 +510,7 @@ NPUnload(
 	__in FLT_FILTER_UNLOAD_FLAGS Flags
 )
 {
-	DbgBreakPoint();
+	KdBreakPoint();
 	UNREFERENCED_PARAMETER(Flags);
 
 	PAGED_CODE();
@@ -706,7 +706,7 @@ NPMiniMessage(
 			//開放規則
 		case ENUM_ADD_RULE:
 		{
-			//DbgBreakPoint();
+			//KdBreakPoint();
 			DbgPrint("[mini-filter] ENUM_ADD_RULE");
 			BOOLEAN bSucc = AddMiniFilterRuleInfo(InputBuffer, InputBufferSize);
 			if (bSucc == FALSE)

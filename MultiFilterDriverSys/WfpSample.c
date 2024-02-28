@@ -22,7 +22,7 @@ HANDLE	g_hEngine = NULL;
 
 NTSTATUS WfpDriverEntry(__in struct _DRIVER_OBJECT* DriverObject, __in PUNICODE_STRING RegistryPath)
 {
-	DbgBreakPoint();
+	KdBreakPoint();
 	NTSTATUS nStatus = STATUS_UNSUCCESSFUL;
 	UNREFERENCED_PARAMETER(RegistryPath);
 	do
@@ -89,7 +89,7 @@ NTSTATUS WfpSampleIRPDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 		{
 		case IOCTL_WFP_SAMPLE_ADD_RULE:
 		{
-			//DbgBreakPoint();
+			//KdBreakPoint();
 			KdPrintEx((77, 0, "%s %s %d IOCTL_WFP_SAMPLE_ADD_RULE \n", __FILE__, __FUNCTION__, __LINE__));
 			BOOLEAN bSucc = FALSE;
 			bSucc = AddNetRuleInfo(pSystemBuffer, uInLen);
@@ -101,7 +101,7 @@ NTSTATUS WfpSampleIRPDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 		}
 		case IOCTL_WFP_SAMPLE_ADDRESS_ADD:
 		{
-			//DbgBreakPoint();
+			//KdBreakPoint();
 			KdPrintEx((77, 0, "%s %s %d\n", __FILE__, __FUNCTION__, __LINE__));
 			BOOLEAN bSucc = FALSE;
 			bSucc = AddNetRuleInfo(pSystemBuffer, uInLen);
@@ -113,7 +113,7 @@ NTSTATUS WfpSampleIRPDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 		}
 		case IOCTL_WFP_SAMPLE_REMOVE_RULE:
 		{
-			//DbgBreakPoint();
+			//KdBreakPoint();
 			BOOLEAN bSucc = FALSE;
 			bSucc = UninitRuleInfo();
 			if (bSucc == FALSE)
@@ -522,7 +522,7 @@ VOID NTAPI Wfp_Sample_Established_ClassifyFn_V4(
 
 
 {
-	//DbgBreakPoint();
+	//KdBreakPoint();
 	WORD	wDirection = 0;
 	WORD	wRemotePort = 0;
 	WORD	wSrcPort = 0;
@@ -587,7 +587,7 @@ VOID NTAPI Wfp_Sample_Stream_ClassifyFn_V4(
 
 {
 	// FWPM_LAYER_STREAM_V4
-	// DbgBreakPoint();
+	// KdBreakPoint();
 	// 默认"允许"(PERMIT)
 	classifyOut->actionType = FWP_ACTION_PERMIT;
 
@@ -595,7 +595,7 @@ VOID NTAPI Wfp_Sample_Stream_ClassifyFn_V4(
 	if (streamPacket != NULL && streamPacket->streamData != NULL &&
 		streamPacket->streamData->dataLength != 0)
 	{
-		//DbgBreakPoint();
+		//KdBreakPoint();
 		////得到数据流指针
 		FWPS_STREAM_DATA0* streamBuffer = streamPacket->streamData;
 

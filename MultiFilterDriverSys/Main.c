@@ -114,7 +114,7 @@ NTSTATUS IrpControlDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 
 NTSTATUS DriverEntry(__in struct _DRIVER_OBJECT* DriverObject, __in PUNICODE_STRING RegistryPath)
 {
-	DbgBreakPoint();
+	KdBreakPoint();
 	NTSTATUS nStatus = STATUS_UNSUCCESSFUL;
 	UNREFERENCED_PARAMETER(RegistryPath);
 	if (DriverObject == NULL)
@@ -133,7 +133,7 @@ NTSTATUS DriverEntry(__in struct _DRIVER_OBJECT* DriverObject, __in PUNICODE_STR
 
 //NTSTATUS DriverEntry(__in struct _DRIVER_OBJECT* DriverObject, __in PUNICODE_STRING RegistryPath)
 //{
-//	DbgBreakPoint();
+//	KdBreakPoint();
 //	NTSTATUS nStatus = STATUS_UNSUCCESSFUL;
 //	nStatus = WfpDriverEntry(DriverObject, RegistryPath);
 //	nStatus = MiniFilterDriverEntry(DriverObject, RegistryPath);

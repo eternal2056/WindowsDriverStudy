@@ -111,7 +111,7 @@ BOOLEAN initialize()
 	unsigned long win32kfull_length = 0;
 	get_module_base_address("win32kfull.sys", &win32kfull_address, &win32kfull_length);
 	DbgPrintEx(0, 0, "[+] win32kfull base address is 0x%llX \n", win32kfull_address);
-	//DbgBreakPoint();
+	//KdBreakPoint();
 	//if (MmIsAddressValid((void*)win32kfull_address) == FALSE) return false;
 
 	/*
@@ -156,7 +156,7 @@ VOID CoverProcessDriverUnload(DRIVER_OBJECT* DriverObject) {
 
 	RtlInitUnicodeString(&symbolicLinkName, KILLRULE_DOSDEVICE_NAME); // 替换为实际链接名称
 	IoDeleteSymbolicLink(&symbolicLinkName);
-	DbgBreakPoint();
+	KdBreakPoint();
 	IoDeleteDevice(DriverObject->DeviceObject);
 	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "DriverUnload\n"));
 }
