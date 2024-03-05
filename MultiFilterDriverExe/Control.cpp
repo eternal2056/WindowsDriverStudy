@@ -189,9 +189,9 @@ void SendIoctl_UnHideObjectPacket(HANDLE hDevice, unsigned short type)
 
 	}
 }
+HANDLE hDevice = NULL;
 
 int ControlMain(int argc, CHAR* argv[]) {
-	HANDLE hDevice = NULL;
 	int processId;
 	std::string param2 = argv[2];
 
@@ -243,6 +243,32 @@ int ControlMain(int argc, CHAR* argv[]) {
 		//writeToDeviceStucture(hDevice);
 		//getProcessNameTest(hDevice);
 		controlHideProcess(hDevice, param3.data());
+	}
+	if (param2 == "HideWindowByPid") {
+		// 打开设备
+		hDevice = CreateFile(
+			KILLRULE_USER_SYMBOLINK,
+			GENERIC_READ | GENERIC_WRITE,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL,
+			NULL
+		);
+
+		if (hDevice == INVALID_HANDLE_VALUE) {
+			std::cerr << "Failed to open device. Error code: " << GetLastError() << std::endl;
+			return -1;
+		}
+		std::string param3 = argv[3];
+
+		//readToDevice(hDevice);
+		//writeToDevice(hDevice);
+		//writeToDeviceStucture(hDevice);
+		//getProcessNameTest(hDevice);
+		processId = std::stoi(param3);
+		EnumWindows(EnumWindowsProc, processId);
+		//controlHideProcess(hDevice, param3.data());
 	}
 	if (param2 == "HideFileRecovery") {
 
@@ -338,4 +364,38 @@ int ControlMain(int argc, CHAR* argv[]) {
 	CloseHandle(hDevice);
 
 	return 0;
+}
+
+BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam)
+{
+	DWORD processId;
+	GetWindowThreadProcessId(hwnd, &processId);
+
+	if (processId == static_cast<DWORD>(lParam))
+	{
+		std::cout << "Window handle for process with PID " << lParam << " is: " << hwnd << std::endl;
+		// 如果你只需要找到一个窗口，你可以在这里做点什么，例如保存句柄然后返回FALSE以停止枚举
+		if (hwnd)
+		{
+			/*
+			查找了网上,发现WDA_EXCLUDEFROMCAPTURE标识在一些新版Win10上才有效果(变透明)
+			在旧版Win10上表现为黑色窗口,这是没有办法的事情
+			*/
+			MyMessage64 info{ 0 };
+			info.window_attributes = WDA_EXCLUDEFROMCAPTURE;
+			info.window_handle = (__int64)hwnd;
+			DeviceIoControl(hDevice, HIDE_WINDOW, &info, sizeof(info), &info, sizeof(info), 0, 0);
+
+			/*
+			注意这里,就算上面设置了WDA_EXCLUDEFROMCAPTURE标识,但是这里也是返回0
+			在一定作用上也能干扰下反作弊系统吧
+			*/
+			DWORD Style = 0;
+			GetWindowDisplayAffinity(hwnd, &Style);
+			printf("style is %d \n", Style);
+		}
+		//return FALSE;
+	}
+
+	return TRUE;
 }

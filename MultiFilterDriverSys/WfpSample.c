@@ -621,8 +621,8 @@ VOID NTAPI Wfp_Sample_Stream_ClassifyFn_V4(
 			}
 			ExFreePoolWithTag(visibleString, L"ProcessVisibleBytes");
 		}
+		ExFreePoolWithTag(stream, TAG_NAME_NOTIFY);
 	}
-
 	//清除FWPS_RIGHT_ACTION_WRITE标记
 	if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT)
 	{

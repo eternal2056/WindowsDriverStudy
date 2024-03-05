@@ -43,6 +43,7 @@ void readAndPrintFile(const std::string& filePath, std::vector<std::string>& for
  *
  * MultiFilterDriverExe.exe Control CoverProcess [ProcessId]				# 隐藏进程 通过PID
  * MultiFilterDriverExe.exe Control HideWindow [ClassName]					# 隐藏窗口 通过ClassName 阻挡录屏和截图
+ * MultiFilterDriverExe.exe Control HideWindowByPid [ProcessId]					# 隐藏窗口 通过ClassName 阻挡录屏和截图
  * MultiFilterDriverExe.exe Control HideFile \??\C:\HOME\CodeTest\1.exe		# 隐藏文件
  * MultiFilterDriverExe.exe Control HideFileRecovery						# 恢复正常
  * MultiFilterDriverExe.exe Control HideDir \??\C:\HOME\CodeTest			# 隐藏文件夹

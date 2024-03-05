@@ -380,7 +380,7 @@ NTSTATUS c2pDispatchRead(
 	return  IoCallDriver(devExt->LowerDeviceObject, Irp);
 }
 
-NTSTATUS DriverEntry(
+NTSTATUS Entry(
 	IN PDRIVER_OBJECT DriverObject,
 	IN PUNICODE_STRING RegistryPath
 )

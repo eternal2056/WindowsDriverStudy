@@ -130,3 +130,4 @@ typedef struct _MyMessage64
 }MyMessage64, * PMyMessage64;
 
 void controlHideProcess(HANDLE hDevice, wchar_t* className);
+BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam);
